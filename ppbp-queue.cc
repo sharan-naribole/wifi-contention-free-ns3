@@ -37,11 +37,11 @@ PPBPQueue::GetTypeId (void)
 					   MakeUintegerAccessor (&PPBPQueue::m_nodeId),
 					   MakeUintegerChecker<uint32_t> (1))
 		.AddAttribute ("MeanBurstArrivals", "Mean Active Sources",
-					   DoubleValue (5.0),
+					   DoubleValue (20.0),
  					   MakeDoubleAccessor (&PPBPQueue::m_burstArrivals),
 					   MakeDoubleChecker<double> (1))
 		.AddAttribute ("MeanBurstTimeLength", "Pareto distributed burst durations",
-					   DoubleValue (0.05),
+					   DoubleValue (0.2),
 					   MakeDoubleAccessor (&PPBPQueue::m_burstLength),
 					   MakeDoubleChecker<double> ())
 		.AddAttribute ("H", "Hurst parameter",
@@ -55,14 +55,14 @@ PPBPQueue::GetTypeId (void)
   return tid;
 }
 
-PPBPQueue::PPBPQueue(uint32_t nodeId)
-:m_nodeId(nodeId)
+void PPBPQueue::SetNodeId(uint32_t nodeId)
 {
+  m_nodeId = nodeId;
 }
 
-PPBPQueue::PPBPQueue(double burstArrivals)
-:m_burstArrivals(burstArrivals)
+void PPBPQueue::SetBurstArrivals(double burstArrivals)
 {
+  m_burstArrivals = burstArrivals;
 }
 
 PPBPQueue::PPBPQueue(double burstArrivals,
@@ -80,13 +80,12 @@ void PPBPQueue::StartPPBP()
   m_onPeriod = true;
   m_stop = false;
 
-  /*
-  std::cout << "Starting PPBP first burst for Node "
-  << m_nodeId << std::endl;
 
-  std::cout << "Initial Queue Size of Node : "
-  << m_nodeId << " = " << m_packetQueue.size() << std::endl;
-  */
+  NS_LOG_UNCOND("Starting PPBP first burst for Node " << m_nodeId);
+
+  //std::cout << "Initial Queue Size of Node : "
+  //<< m_nodeId << " = " << m_packetQueue.size() << std::endl;
+
 
   double inter_burst_intervals;
 	inter_burst_intervals = (double)1/m_burstArrivals;
@@ -95,7 +94,7 @@ void PPBPQueue::StartPPBP()
   m_paretoVar = CreateObject<ParetoRandomVariable> ();
 
   m_expVar->SetAttribute ("Mean", DoubleValue (inter_burst_intervals));
-  m_expVar->SetAttribute ("Bound", DoubleValue (3.0));
+  //m_expVar->SetAttribute ("Bound", DoubleValue (3.0));
 
   double m_shape = 3 - (2 * m_h);
   double m_scale = (double) (m_shape - 1) * m_burstLength / m_shape;
@@ -147,6 +146,7 @@ void PPBPQueue::PushPacket()
     m_packetQueue.push(packet);
 
     m_txTrace (packet);
+
     /*
     std::cout << "Queue size of Node "
     << m_nodeId
@@ -155,6 +155,7 @@ void PPBPQueue::PushPacket()
     << " at " << Simulator::Now().GetSeconds()
     << std::endl;
     */
+
 
     Simulator::Schedule(Seconds(0.0),&PPBPQueue::ScheduleNextTx,this);
   }
