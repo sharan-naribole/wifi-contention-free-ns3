@@ -6,8 +6,6 @@
 #include "ns3/propagation-loss-model.h"
 #include "ns3/propagation-delay-model.h"
 #include "ns3/nist-error-rate-model.h"
-#include "ns3/constant-position-mobility-model.h"
-#include "ns3/random-variable-stream.h"
 
 using namespace ns3;
 
@@ -34,6 +32,11 @@ static void StopCFP(CFPPhyBase *cfp)
   cfp->StopCFP();
 }
 
+static void OutputCFP(CFPPhyBase *cfp)
+{
+  cfp->OutputCFP();
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -47,12 +50,10 @@ main (int argc, char *argv[])
 
   // Enable the packet printing through Packet::Print command.
   Packet::EnablePrinting ();
-
-  nSta = 10;
   double distance = 5;
   WifiPhyStandard standard = WIFI_PHY_STANDARD_80211a;
-  uint8_t downlinkChannelNumber = 4;
-  uint8_t uplinkChannelNumber = 1;
+  uint8_t downlinkChannelNumber = 7;
+  uint8_t uplinkChannelNumber = 7;
 
   Ptr<YansWifiChannel> dlChannel = CreateObject<YansWifiChannel> ();
   dlChannel->SetPropagationDelayModel (CreateObject<ConstantSpeedPropagationDelayModel> ());
@@ -68,7 +69,7 @@ main (int argc, char *argv[])
   ApPhyNode* apNode;
   apNode = new ApPhyNode(0, "OfdmRate6Mbps",0, 0);
   apNode->PhyDownlinkSetup(standard, dlChannel, error,downlinkChannelNumber);
-  apNode->PhyUplinkSetup(standard, ulChannel, error,uplinkChannelNumber, true);
+  apNode->PhyUplinkSetup(standard, ulChannel, error,uplinkChannelNumber, false);
 
   std::vector<StaPhyNode*> staNodes;
   for(uint32_t i = 0; i < nSta; i++)
@@ -76,7 +77,7 @@ main (int argc, char *argv[])
     StaPhyNode* temp;
     temp = new StaPhyNode(apNode, i+1, "OfdmRate54Mbps", 0, distance*pow(-1,i));
     temp->PhyDownlinkSetup(standard, dlChannel, error,downlinkChannelNumber);
-    temp->PhyUplinkSetup(standard, ulChannel, error,uplinkChannelNumber, true);
+    temp->PhyUplinkSetup(standard, ulChannel, error,uplinkChannelNumber, false);
     staNodes.push_back(temp);
   }
 
@@ -87,6 +88,7 @@ main (int argc, char *argv[])
   Simulator::Schedule(Seconds(1.0),&GetChannelNumbers, apNode);
   Simulator::Schedule(Seconds(0.1),&StartCFP, &cfp);
   Simulator::Schedule(Seconds(1),&StopCFP, &cfp);
+  Simulator::Schedule(Seconds(1),&OutputCFP, &cfp);
   Simulator::Stop(Seconds(1));
   Simulator::Run();
   Simulator::Destroy();

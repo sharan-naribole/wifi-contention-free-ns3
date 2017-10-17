@@ -17,7 +17,11 @@ std::vector<PhyNode*> staNodes;
 
 void TransmitPacket(std::string msg)
 {
-  staNodes[0]->Send(2, 1470,msg);
+  staNodes[0]->Send(99999, 1470,msg);
+  // Because the Serializatio is 4 bytes; for values greater than
+  // 4 bytes, header gets encoded differently
+  // for 9999 it gives 9999 correctly
+  // for 99999 it gives 34463
 }
 
 void ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVector)

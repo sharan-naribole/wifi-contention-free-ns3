@@ -56,6 +56,14 @@ PhyNode::PhyNode (uint32_t nodeId, std::string txMode, uint8_t txPowerLevel,
     m_nodeId(nodeId)
 {
    m_position->SetPosition (Vector (m_distance, 0.0, 0.0));
+
+   WifiMode mode = WifiMode (txMode);
+   WifiTxVector txVector;
+   txVector.SetTxPowerLevel (txPowerLevel);
+   txVector.SetMode (mode);
+   txVector.SetPreambleType (WIFI_PREAMBLE_LONG);
+
+   m_datarate = mode.GetDataRate(txVector);
 }
 
 void PhyNode::PhyDownlinkSetup(WifiPhyStandard standard, Ptr<YansWifiChannel> channel,
@@ -90,35 +98,6 @@ void PhyNode::PhyUplinkSetup(WifiPhyStandard standard, Ptr<YansWifiChannel> chan
 }
 
 void
-PhyNode::Send (uint32_t nodeId, uint32_t packetSize,
-              std::string msg)
-{
-  std::stringstream msgx;
-  Ptr<Packet> packet;
-
-  msgx << msg;
-  uint32_t msgSize = msg.length();
-  //std::cout << "Message size = " << msgSize << std::endl;
-  packet = Create<Packet>((uint8_t*) msgx.str().c_str(), packetSize);
-  if(msgSize < packetSize)
-  {
-    packet->AddPaddingAtEnd(packetSize - msgSize);
-  }
-
-  BasicHeader sourceHeader;
-  sourceHeader.SetData (nodeId);
-  packet->AddHeader (sourceHeader);
-
-  WifiMode mode = WifiMode (m_txMode);
-  WifiTxVector txVector;
-  txVector.SetTxPowerLevel (m_txPowerLevel);
-  txVector.SetMode (mode);
-  txVector.SetPreambleType (WIFI_PREAMBLE_LONG);
-
-  m_dl->SendPacket (packet, txVector);
-}
-
-void
 PhyNode::Send (Ptr<YansWifiPhy> m_tx, uint32_t nodeId, uint32_t packetSize)
 {
   Ptr<Packet> p = Create<Packet>(packetSize);
@@ -145,7 +124,7 @@ PhyNode::Send (Ptr<YansWifiPhy> m_tx, uint32_t nodeId, uint32_t packetSize,
 
   msgx << msg;
   uint32_t msgSize = msg.length();
-  std::cout << "Message size = " << msgSize << std::endl;
+  //std::cout << "Message size = " << msgSize << std::endl;
   packet = Create<Packet>((uint8_t*) msgx.str().c_str(), packetSize);
   if(msgSize < packetSize)
   {

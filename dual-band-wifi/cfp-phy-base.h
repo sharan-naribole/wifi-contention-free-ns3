@@ -16,6 +16,13 @@ class CFPPhyBase
     uint32_t m_staIndex;
     bool m_stop;
 
+    struct Output
+    {
+      double m_delayMean = 0;
+      uint32_t m_overhead = 0; ///< packet size
+      double m_throughput = 0; ///< number of packets
+    } m_output;
+
   public:
     std::vector<StaPhyNode*> m_staNodes;
     ApPhyNode* m_apNode;
@@ -25,6 +32,7 @@ class CFPPhyBase
     ~CFPPhyBase();
     void StartCFP();
     void StopCFP();
+    void OutputCFP();
 };
 
 CFPPhyBase::CFPPhyBase(std::vector<StaPhyNode*> staNodes,
@@ -65,7 +73,32 @@ void CFPPhyBase::StopCFP()
   {
     m_staNodes[i]->StopTraffic();
   }
-  Simulator::Stop();
+}
+
+void CFPPhyBase::OutputCFP()
+{
+  // Computing Metrics
+  m_output.m_throughput = m_apNode->GetThroughput();
+  m_output.m_overhead = m_apNode->GetOverhead();
+
+  double delaySum = 0;
+  uint32_t NpacketsTotal = 0;
+
+  for(uint32_t staIter = 0; staIter < m_staNodes.size(); staIter++)
+  {
+    delaySum += m_staNodes[staIter]->GetDelaySum();
+    NpacketsTotal += m_staNodes[staIter]->GetNPacketsTX();
+  }
+
+  if(NpacketsTotal > 0)
+  {
+    m_output.m_delayMean = (double) delaySum / (double) NpacketsTotal;
+  }
+
+  std::cout << "Metrics: " << std::endl;
+  std::cout << "Delay (ms): " << 0.001*m_output.m_delayMean << std::endl;
+  std::cout << "Throughput (Mbps): " << m_output.m_throughput << std::endl;
+  std::cout << "Overhead (ms): " << 0.001*m_output.m_overhead << std::endl;
 }
 
 
