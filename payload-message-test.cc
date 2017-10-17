@@ -38,20 +38,11 @@ void ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVector)
   std::cout << "Size after Header Removal = "
   << p->GetSize() << std::endl;
 
-  /*
-  BasicTrailer trailer;
-  p->RemoveTrailer (trailer);
-  std::cout << "Trailer = "
-  << trailer.GetData() << std::endl;
-
-  p->RemoveAtEnd(trailer.GetData());
-  */
-
   uint8_t *buffer = new uint8_t[p->GetSize ()];
   p->CopyData(buffer, p->GetSize ());
 
   std::string msg = std::string((char*)buffer);
-  std::cout<<"Received:"<< msg << std::endl;
+  std::cout<<"Received: "<< msg << std::endl;
 
   Simulator::Schedule(Seconds(1.0),&TransmitPacket,"Hello Sharan");
 }

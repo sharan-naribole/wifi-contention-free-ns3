@@ -98,23 +98,12 @@ PhyNode::Send (uint32_t nodeId, uint32_t packetSize,
 
   msgx << msg;
   uint32_t msgSize = msg.length();
-  std::cout << "Message size = " << msgSize << std::endl;
+  //std::cout << "Message size = " << msgSize << std::endl;
   packet = Create<Packet>((uint8_t*) msgx.str().c_str(), packetSize);
   if(msgSize < packetSize)
   {
     packet->AddPaddingAtEnd(packetSize - msgSize);
   }
-
-  uint32_t sizeDiff= packetSize - msgSize;
-  std::cout << "sizeDiff = " << sizeDiff << std::endl;
-  /*
-  if(sizeDiff > 0)
-  {
-    BasicTrailer sourceTrailer;
-    sourceTrailer.SetData(sizeDiff);
-    packet->AddTrailer (sourceTrailer);
-  }
-  */
 
   BasicHeader sourceHeader;
   sourceHeader.SetData (nodeId);
@@ -161,15 +150,6 @@ PhyNode::Send (Ptr<YansWifiPhy> m_tx, uint32_t nodeId, uint32_t packetSize,
   if(msgSize < packetSize)
   {
     packet->AddPaddingAtEnd(packetSize - msgSize);
-  }
-
-  uint32_t sizeDiff= packetSize - msgSize;
-  std::cout << "sizeDiff = " << sizeDiff << std::endl;
-  if(sizeDiff > 0)
-  {
-    BasicTrailer sourceTrailer;
-    sourceTrailer.SetData(sizeDiff);
-    packet->AddTrailer (sourceTrailer);
   }
 
   BasicHeader sourceHeader;
