@@ -8,11 +8,19 @@ using namespace ns3;
 class PhyNode : public Object
 {
 public:
+  Ptr<YansWifiPhy> m_dl = CreateObject<YansWifiPhy> (); ///< transmit
+  Ptr<YansWifiPhy> m_ul = CreateObject<YansWifiPhy> ();
   PhyNode();
   virtual ~PhyNode();
   static TypeId GetTypeId (void);
   PhyNode (uint32_t, std::string, uint8_t, double);
-  void Send (Ptr<YansWifiPhy>, uint32_t nodeId, uint32_t packestSize);
+  void PhyDownlinkSetup(WifiPhyStandard, Ptr<YansWifiChannel>, Ptr<ErrorRateModel>,
+                        uint8_t);
+  void PhyUplinkSetup(WifiPhyStandard, Ptr<YansWifiChannel>, Ptr<ErrorRateModel>,
+                   uint8_t, bool);
+  void Send (uint32_t, uint32_t, std::string);                 
+  void Send (Ptr<YansWifiPhy>, uint32_t, uint32_t);
+  void Send (Ptr<YansWifiPhy>, uint32_t, uint32_t, std::string);
   void GetChannelNumbers();
 
 protected:
@@ -20,10 +28,8 @@ protected:
   std::string m_txMode; ///< transmit mode; Modulation
   uint8_t m_txPowerLevel; ///< transmit power level
   uint32_t m_nodeId;
-  bool multiband;
+  bool m_multiband = false;
   uint8_t m_dlChannelNumber;
   uint8_t m_ulChannelNumber;
-  Ptr<YansWifiPhy> m_dl = CreateObject<YansWifiPhy> (); ///< transmit
-  Ptr<YansWifiPhy> m_ul = CreateObject<YansWifiPhy> ();
   Ptr<MobilityModel> m_position = CreateObject<ConstantPositionMobilityModel> ();
 };
