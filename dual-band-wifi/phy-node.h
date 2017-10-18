@@ -20,6 +20,9 @@ public:
   void Send (Ptr<YansWifiPhy>, uint32_t, uint32_t, std::string);
   void GetChannelNumbers();
 
+  Ptr<YansWifiPhy> m_dl = CreateObject<YansWifiPhy> (); ///< transmit
+  Ptr<YansWifiPhy> m_ul = CreateObject<YansWifiPhy> ();
+
 protected:
   double m_distance; ///< distance
   std::string m_txMode; ///< transmit mode; Modulation
@@ -30,6 +33,4 @@ protected:
   uint8_t m_dlChannelNumber;
   uint8_t m_ulChannelNumber;
   Ptr<MobilityModel> m_position = CreateObject<ConstantPositionMobilityModel> ();
-  Ptr<YansWifiPhy> m_dl = CreateObject<YansWifiPhy> (); ///< transmit
-  Ptr<YansWifiPhy> m_ul = CreateObject<YansWifiPhy> ();
 };
