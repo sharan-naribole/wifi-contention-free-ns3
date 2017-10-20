@@ -7,6 +7,7 @@
 #include "ns3/network-module.h"
 #include "ns3/wifi-module.h"
 #include "ns3/mobility-module.h"
+#include "ns3/random-variable-stream.h"
 
 using namespace ns3;
 
@@ -31,7 +32,7 @@ PhyNode::GetTypeId (void)
     .AddAttribute ("Distance", "The distance from AP",
              DoubleValue (5.0),
              MakeDoubleAccessor (&PhyNode::m_distance),
-             MakeDoubleChecker<uint32_t> (1))
+             MakeDoubleChecker<double> ())
 		.AddAttribute ("WiFiTxMode", "WifiMode for transmission",
 					   StringValue ("OfdmRate6Mbps"),
 					   MakeStringAccessor (&PhyNode::m_txMode),
@@ -44,6 +45,10 @@ PhyNode::GetTypeId (void)
 					   UintegerValue (0),
 					   MakeUintegerAccessor (&PhyNode::m_nodeId),
 					   MakeUintegerChecker<uint32_t> (1))
+    .AddAttribute ("IntfErrorRate", "Interference error rate",
+            DoubleValue (0.001),
+            MakeDoubleAccessor (&PhyNode::m_intfErrorRate),
+            MakeDoubleChecker<double> ())
   ;
   return tid;
 }
@@ -95,6 +100,14 @@ void PhyNode::PhyUplinkSetup(WifiPhyStandard standard, Ptr<YansWifiChannel> chan
     m_ul = m_dl;
   }
 
+}
+
+void PhyNode::InterferenceSetup()
+{
+  Ptr<UniformRandomVariable> uniform = CreateObject<UniformRandomVariable> ();
+  m_rem->SetRandomVariable (uniform);
+  m_rem->SetRate (m_intfErrorRate);
+  m_rem->SetAttribute("ErrorUnit",EnumValue(RateErrorModel::ERROR_UNIT_PACKET));
 }
 
 void
