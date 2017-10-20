@@ -42,6 +42,7 @@ main (int argc, char *argv[])
 {
 
   uint32_t nSta = 2; //Number of stationary nodes
+  double errorRate = 0.2;
 
   Time::SetResolution(Time::US);
 
@@ -70,6 +71,7 @@ main (int argc, char *argv[])
   apNode = new ApPhyNode(0, "OfdmRate6Mbps",0, 0);
   apNode->PhyDownlinkSetup(standard, dlChannel, error,downlinkChannelNumber);
   apNode->PhyUplinkSetup(standard, ulChannel, error,uplinkChannelNumber, false);
+  apNode->InterferenceSetup(errorRate);
 
   std::vector<StaPhyNode*> staNodes;
   for(uint32_t i = 0; i < nSta; i++)
@@ -78,6 +80,7 @@ main (int argc, char *argv[])
     temp = new StaPhyNode(apNode, i+1, "OfdmRate54Mbps", 0, distance*pow(-1,i));
     temp->PhyDownlinkSetup(standard, dlChannel, error,downlinkChannelNumber);
     temp->PhyUplinkSetup(standard, ulChannel, error,uplinkChannelNumber, false);
+    temp->InterferenceSetup(errorRate);
     staNodes.push_back(temp);
   }
 

@@ -40,7 +40,7 @@ private:
 
   void TransmitPollRequest();
   void ReceivePollReply(Ptr<Packet> p, double snr, WifiTxVector txVector);
-  void TransmitACK();
+  void TransmitACK(std::string msg);
   void CheckIdle();
   void StartIdleTimer();
 
@@ -135,9 +135,10 @@ void ApPhyNode::TransmitPollRequest()
     //<< Simulator::Now ().GetMicroSeconds ()
     //<< std::endl;
 
-    Time pollTxTime (MicroSeconds ((double)(pollSize* 8.0*1000000) /((double) m_datarate)));
+    //Time pollTxTime (MicroSeconds ((double)(pollSize* 8.0*1000000) /((double) m_datarate)));
 
-    m_overhead += pollTxTime.GetMicroSeconds();
+    // Need to change this based on poll TX Time
+    m_overhead += pollTxTime; // from Globals
     //std::cout << "Waiting time = " << pollTxTime + (MicroSeconds(PIFS))
     //<< std::endl;
 
@@ -157,34 +158,42 @@ void ApPhyNode::TransmitPollRequest()
 
 void ApPhyNode::ReceivePollReply (Ptr<Packet> p, double snr, WifiTxVector txVector)
 {
-  BasicHeader destinationHeader;
-  p->RemoveHeader (destinationHeader);
-
-  if(destinationHeader.GetData() == 0)
+  // At this stage, I will check the Interference Model
+  if(m_rem->IsCorrupt (p) == false)
   {
-    /*
-    std::cout << "Received poll reply by Node "
-    << destinationHeader.GetData() << " of size "
-    << p->GetSize() << " at "
-    << Simulator::Now().GetMicroSeconds()
-    << std::endl;
-    */
+    BasicHeader destinationHeader;
+    p->RemoveHeader (destinationHeader);
 
-    m_rxBytes += p->GetSize();
+    if(destinationHeader.GetData() == 0)
+    {
+      /*
+      std::cout << "Received poll reply by Node "
+      << destinationHeader.GetData() << " of size "
+      << p->GetSize() << " at "
+      << Simulator::Now().GetMicroSeconds()
+      << std::endl;
+      */
 
-    Simulator::Schedule(MicroSeconds(SIFS),&ApPhyNode::TransmitACK,this);
-    //Simulator::Schedule(MicroSeconds(PIFS),&ApPhyNode::TransmitPollRequest,this);
+      m_rxBytes += p->GetSize();
+
+      Simulator::Schedule(MicroSeconds(SIFS),&ApPhyNode::TransmitACK,this, "ACK");
+      //Simulator::Schedule(MicroSeconds(PIFS),&ApPhyNode::TransmitPollRequest,this);
+    }
+  }
+  else
+  {
+    Simulator::Schedule(MicroSeconds(SIFS),&ApPhyNode::TransmitACK,this, "NACK");
   }
 }
 
-void ApPhyNode::TransmitACK()
+void ApPhyNode::TransmitACK(std::string message)
 {
-  Send(m_dl,m_prevIndex, ACKSize, "ACK");
-  /*
-  std::cout << "Transmitted ACK at "
-  << Simulator::Now ().GetMicroSeconds ()
-  << std::endl;
-  */
+  Send(m_dl,m_prevIndex, ACKSize, message);
+
+  //std::cout << "Transmitted " << message << " at "
+  //<< Simulator::Now ().GetMicroSeconds ()
+  //<< std::endl;
+
   //Time ACKTxTime (MicroSeconds ((double)(ACKSize* 8.0*1000000) /((double) m_datarate)));
   //Simulator::Schedule(MicroSeconds((double)1.2*ACKTxTime),&ApPhyNode::TransmitPollRequest,this);
 }

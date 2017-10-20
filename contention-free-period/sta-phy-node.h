@@ -13,7 +13,6 @@ protected:
   std::queue<Ptr<Packet>> m_reTxQueue;
   double m_delaySum = 0;
   uint32_t m_NPacketsTX = 0;
-  bool m_ACKRx = false;
   //PPBPGenerator* m_ppbp;
   void PacketQueuePop();
   void ReceivePacket (Ptr<Packet> p, double snr, WifiTxVector txVector);
@@ -112,7 +111,7 @@ void StaPhyNode::PacketQueuePop()
     // If no ACK, retransmission queue won't be cleared
     // Those packets will be pushed back into main queue
     // with new generated Timestamps
-    Time pollReplyTxTime (MicroSeconds ((double)(aggPktSize* 8.0*1000000) /((double) m_datarate)));
+    //Time pollReplyTxTime (MicroSeconds ((double)(aggPktSize* 8.0*1000000) /((double) m_datarate)));
     //Simulator::Schedule(pollReplyTxTime + (MicroSeconds(SIFS + ACKTimeout)), &StaPhyNode::CheckACKRx, this);
 }
 
@@ -143,12 +142,20 @@ void StaPhyNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVector)
 
     std::string msg = std::string((char*)buffer);
     //std::cout<<"Received: "<< msg << std::endl;
-    if(msg == "ACK")
+    if(msg == "ACK" || msg == "NACK")
     {
+      if(msg == "NACK")
+      {
+        /*
+        std::cout << "Received " << msg << " by Node"
+        << m_nodeId << " at "
+        << Simulator::Now().GetMicroSeconds() << std::endl;
+        */
+        m_ppbp->PushQueue(m_reTxQueue);
+      }
       // Clearing the retransmission queue on receiving ACK
       std::queue<Ptr<Packet>> temp;
       temp.swap(m_reTxQueue);
-      m_ACKRx = true;
       m_apNode->TransmitPollRequest();
     }
     else if( msg == "REQ")
@@ -157,59 +164,48 @@ void StaPhyNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVector)
       // Otherwise Polling completely stops
        m_apNode -> StartIdleTimer();
        //Extracting WiFi Socket
-       uint32_t Npackets = m_ppbp->m_packetQueue.size();
 
-       if(Npackets > 0)
-       {
-         m_reTxQueue = m_ppbp->m_packetQueue;
-         //Transmitting Poll reply
+       // At this stage, I will check the Interference Model
+       if(m_rem->IsCorrupt (p) == false)
+         {
+           uint32_t Npackets = m_ppbp->m_packetQueue.size();
 
-         /*
-         std::cout << "Transmitting "
-         << Npackets << " packets by Node "
-         << m_nodeId<< " at "
-         << Simulator::Now ().GetMicroSeconds ()
-         << std::endl;
-         */
+           if(Npackets > 0)
+           {
+             m_reTxQueue = m_ppbp->m_packetQueue;
+             //Transmitting Poll reply
+
+             /*
+             std::cout << "Transmitting "
+             << Npackets << " packets by Node "
+             << m_nodeId<< " at "
+             << Simulator::Now ().GetMicroSeconds ()
+             << std::endl;
+             */
 
 
-         m_apNode -> m_receiving = true;
-         //std::cout << "AP's RX status changed to true at "
-         //<< Simulator::Now().GetMicroSeconds() << std::endl;
+             m_apNode -> m_receiving = true;
+             //std::cout << "AP's RX status changed to true at "
+             //<< Simulator::Now().GetMicroSeconds() << std::endl;
 
-         Simulator::Schedule(Seconds(0.0),&StaPhyNode::PacketQueuePop,this);
+             Simulator::Schedule(Seconds(0.0),&StaPhyNode::PacketQueuePop,this);
+          }
        }
-     }
-     else
-     {
-       // Do nothing
-     }
-
-   }
-}
-
-// Not being used for now;
-// Have to use it for interference
-void StaPhyNode::CheckACKRx()
-{
-  if(m_ACKRx == false)
-  {
-    //std::cout << "No ACK received" << std::endl;
-    m_ppbp->PushQueue(m_reTxQueue);
+    }
   }
-  m_ACKRx = false;
-
-  //m_apNode -> TransmitPollRequest();
 }
+
 
 void StaPhyNode::PhyRxEnd(Ptr< const Packet > packet)
 {
   if(m_apNode->m_apIdleTimerStart == false)
   {
     m_apNode->m_apIdleTimerStart = true;
+    /*
     std::cout << "RX ends at "
     << Simulator::Now().GetMicroSeconds()
     << std::endl;
+    */
     m_apNode -> StartIdleTimer();
   }
 }
