@@ -11,12 +11,6 @@ using namespace ns3;
 class ApPhyNode: public PhyNode {
 
 public:
-  double m_overhead = 0;
-  uint32_t m_rxBytes = 0;
-  Time m_startTime;
-  Time m_stopTime;
-  double m_runTime;
-  double m_throughput;
   ApPhyNode();
   virtual ~ApPhyNode();
   ApPhyNode(uint32_t, std::string, uint8_t, double);
@@ -36,13 +30,21 @@ private:
   bool m_stop = false;
   bool m_receiving = false;
   bool m_apIdleTimerStart = false;
-  uint32_t m_pollSize = 100;
+
+  double m_overhead = 0;
+  uint32_t m_rxBytes = 0;
+  double m_runTime;
+  double m_throughput;
+
+  Time m_startTime;
+  Time m_stopTime;
 
   void TransmitPollRequest();
   void ReceivePollReply(Ptr<Packet> p, double snr, WifiTxVector txVector);
   void TransmitACK(std::string msg);
   void CheckIdle();
   void StartIdleTimer();
+  void PhyRxBegin(Ptr< const Packet > packet);
 
   friend class StaPhyNode;
 };
@@ -97,9 +99,8 @@ void ApPhyNode::PhyUplinkSetup(WifiPhyStandard standard, Ptr<YansWifiChannel> ch
   }
 
   m_ul -> SetReceiveOkCallback(MakeCallback(&ApPhyNode::ReceivePollReply,this));
-
+  m_ul -> TraceConnectWithoutContext("PhyRxBegin", MakeCallback(&ApPhyNode::PhyRxBegin,this));
 }
-
 
 void ApPhyNode::StartPolling(uint32_t staIndex, uint32_t nSta)
 {
@@ -130,7 +131,7 @@ void ApPhyNode::TransmitPollRequest()
     //<< m_nSta << std::endl;
 
     m_receiving = false;
-    Send(m_dl,m_staIndex, m_pollSize, "REQ"); // Poll Request
+    Send(m_dl,m_staIndex, pollSize, "REQ"); // Poll Request
     //std::cout << "Transmitting poll request at "
     //<< Simulator::Now ().GetMicroSeconds ()
     //<< std::endl;
@@ -182,7 +183,9 @@ void ApPhyNode::ReceivePollReply (Ptr<Packet> p, double snr, WifiTxVector txVect
   }
   else
   {
-    Simulator::Schedule(MicroSeconds(SIFS),&ApPhyNode::TransmitACK,this, "NACK");
+    Simulator::Schedule(MicroSeconds(SIFS),&ApPhyNode::TransmitPollRequest,this);
+    //Simulator::Schedule(MicroSeconds(SIFS),&ApPhyNode::TransmitACK,this, "NACK");
+    //m_staNodes[m_prevIndex]->NACK();
   }
 }
 
@@ -224,6 +227,13 @@ double ApPhyNode::GetThroughput()
 double ApPhyNode::GetOverhead()
 {
   return m_overhead;
+}
+
+void ApPhyNode::PhyRxBegin(Ptr< const Packet > packet)
+{
+  std::cout << "Started Poll Reply Reception at "
+  << Simulator::Now().GetMicroSeconds() << std::endl;
+  m_receiving = true;
 }
 
 
