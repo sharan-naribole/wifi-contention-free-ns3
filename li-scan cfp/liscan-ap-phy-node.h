@@ -131,18 +131,22 @@ void LiscanApNode::TransmitPollRequest()
 
   if(m_stop == false && m_receiving == false)
   {
+    /*
     std::cout << "Station = " << m_staIndex << " out of "
     << m_nSta << std::endl;
+    */
 
     Send(m_dl,m_staIndex, pollSize, "REQ"); // Poll Request
+    /*
     std::cout << "Transmitting poll request at "
     << Simulator::Now ().GetMicroSeconds ()
     << std::endl;
+    */
 
     //Time pollTxTime (MicroSeconds ((double)(pollSize* 8.0*1000000) /((double) m_datarate)));
 
     // Need to change this based on poll TX Time
-    m_overhead += pollTxTime; // from Globals
+    //m_overhead += pollTxTime; // from Globals
     //std::cout << "Waiting time = " << pollTxTime + (MicroSeconds(PIFS))
     //<< std::endl;
 
@@ -170,23 +174,26 @@ void LiscanApNode::ReceivePollReply (Ptr<Packet> p, double snr, WifiTxVector txV
 
     if(destinationHeader.GetData() == 0)
     {
-
+      /*
       std::cout << "Received poll reply by Node "
       << destinationHeader.GetData() << " of size "
       << p->GetSize() << " at "
       << Simulator::Now().GetMicroSeconds()
       << std::endl;
+      */
 
       m_rxBytes += p->GetSize();
 
-      Simulator::Schedule(MicroSeconds(SIFS),&LiscanApNode::TransmitACK,this, "ACK");
+      Simulator::Schedule(MicroSeconds(decodeDelay),&LiscanApNode::TransmitACK,this, "ACK");
+
       //Simulator::Schedule(MicroSeconds(PIFS),&LiscanApNode::TransmitPollRequest,this);
     }
   }
   else
   {
     m_staIndex = m_prevIndex;
-    Simulator::Schedule(MicroSeconds(SIFS),&LiscanApNode::TransmitPollRequest,this);
+    m_overhead += pollTxTime;
+    Simulator::Schedule(MicroSeconds(decodeDelay),&LiscanApNode::TransmitPollRequest,this);
     //Simulator::Schedule(MicroSeconds(SIFS),&LiscanApNode::TransmitACK,this, "NACK");
     //m_staNodes[m_prevIndex]->NACK();
   }
@@ -196,30 +203,14 @@ void LiscanApNode::TransmitACK(std::string message)
 {
   Send(m_dl,m_ackId, ACKSize, message);
 
+  /*
   std::cout << "Transmitted " << message << " at "
   << Simulator::Now ().GetMicroSeconds ()
   << std::endl;
+  */
 
   //Time ACKTxTime (MicroSeconds ((double)(ACKSize* 8.0*1000000) /((double) m_datarate)));
   //Simulator::Schedule(MicroSeconds((double)1.2*ACKTxTime),&LiscanApNode::TransmitPollRequest,this);
-}
-
-void LiscanApNode::CheckIdle()
-{
-  if(m_receiving == false)
-  {
-    m_overhead += PIFS;
-    TransmitPollRequest();
-  }
-  else{
-    m_overhead += SIFS;
-  }
-  m_apIdleTimerStart = false;
-}
-
-void LiscanApNode::StartIdleTimer()
-{
-  Simulator::Schedule(MicroSeconds(PIFS), &LiscanApNode::CheckIdle, this);
 }
 
 double LiscanApNode::GetThroughput()

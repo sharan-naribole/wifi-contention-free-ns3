@@ -178,6 +178,7 @@ void ApPhyNode::ReceivePollReply (Ptr<Packet> p, double snr, WifiTxVector txVect
       m_rxBytes += p->GetSize();
 
       Simulator::Schedule(MicroSeconds(SIFS),&ApPhyNode::TransmitACK,this, "ACK");
+
       //Simulator::Schedule(MicroSeconds(PIFS),&ApPhyNode::TransmitPollRequest,this);
     }
   }
@@ -187,6 +188,8 @@ void ApPhyNode::ReceivePollReply (Ptr<Packet> p, double snr, WifiTxVector txVect
     //Simulator::Schedule(MicroSeconds(SIFS),&ApPhyNode::TransmitACK,this, "NACK");
     //m_staNodes[m_prevIndex]->NACK();
   }
+  m_overhead += (SIFS - decodeDelay); // after Packet reception, switching from
+                                      // RX to TX
 }
 
 void ApPhyNode::TransmitACK(std::string message)
@@ -231,8 +234,8 @@ double ApPhyNode::GetOverhead()
 
 void ApPhyNode::PhyRxBegin(Ptr< const Packet > packet)
 {
-  std::cout << "Started Poll Reply Reception at "
-  << Simulator::Now().GetMicroSeconds() << std::endl;
+  //std::cout << "Started Poll Reply Reception at "
+  //<< Simulator::Now().GetMicroSeconds() << std::endl;
   m_receiving = true;
 }
 

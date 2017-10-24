@@ -9,7 +9,6 @@ class StaPhyNode: public PhyNode {
 
 private:
   ApPhyNode* m_apNode;
-  Ptr<PPBPQueue> m_ppbp = CreateObject<PPBPQueue>();
   std::queue<Ptr<Packet>> m_reTxQueue;
   double m_delaySum = 0;
   uint32_t m_NPacketsTX = 0;
@@ -21,6 +20,7 @@ private:
   void PhyRxEnd(Ptr< const Packet > packet);
 
 public:
+  Ptr<PPBPQueue> m_ppbp = CreateObject<PPBPQueue>();
   StaPhyNode(ApPhyNode*, uint32_t, std::string, uint8_t, double);
   void PhyDownlinkSetup(WifiPhyStandard, Ptr<YansWifiChannel>, Ptr<ErrorRateModel>,
                         uint8_t);
@@ -128,8 +128,8 @@ void StaPhyNode::PacketQueuePop()
 
       Send(m_ul, 0,aggPktSize);
       m_waitingACK = true;
-      std::cout << "Started Poll Reply Transmission at "
-      << Simulator::Now().GetMicroSeconds() << std::endl;
+      //std::cout << "Started Poll Reply Transmission at "
+      //<< Simulator::Now().GetMicroSeconds() << std::endl;
     }
 
     // Need to begin timer for ACK reception

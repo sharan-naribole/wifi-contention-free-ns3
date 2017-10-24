@@ -43,7 +43,7 @@ int
 main (int argc, char *argv[])
 {
 
-  uint32_t nSta = 2; //Number of stationary nodes
+  uint32_t nSta = 10; //Number of stationary nodes
   double errorRate = 0.02;
   double simTime = 100;
 
@@ -71,7 +71,7 @@ main (int argc, char *argv[])
   Ptr<ErrorRateModel> error = CreateObject<NistErrorRateModel> ();
 
   ApPhyNode* apNode;
-  apNode = new ApPhyNode(0, "OfdmRate6Mbps",0, 0);
+  apNode = new ApPhyNode(0, "OfdmRate18Mbps",0, 0);
   apNode->PhyDownlinkSetup(standard, dlChannel, error,downlinkChannelNumber);
   apNode->PhyUplinkSetup(standard, ulChannel, error,uplinkChannelNumber, false);
   apNode->InterferenceSetup(errorRate);
@@ -84,6 +84,7 @@ main (int argc, char *argv[])
     temp->PhyDownlinkSetup(standard, dlChannel, error,downlinkChannelNumber);
     temp->PhyUplinkSetup(standard, ulChannel, error,uplinkChannelNumber, false);
     temp->InterferenceSetup(errorRate);
+    temp->m_ppbp->SetAttribute("MeanBurstArrivals",DoubleValue(100));
     staNodes.push_back(temp);
   }
 

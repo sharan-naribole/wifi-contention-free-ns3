@@ -6,6 +6,8 @@
 #include "ns3/propagation-loss-model.h"
 #include "ns3/propagation-delay-model.h"
 #include "ns3/nist-error-rate-model.h"
+#include "output.h"
+#include <fstream>
 
 using namespace ns3;
 
@@ -20,32 +22,43 @@ static void GetChannelNumbers(ApPhyNode* node)
 
 static void StartCFP(LiScanRun *cfp)
 {
+  /*
   std::cout << "Starting Contention Free Period at "
   << Simulator::Now().GetSeconds()
   << std::endl;
+  */
   cfp->StartCFP();
 }
 
 static void StopCFP(LiScanRun *cfp)
 {
+  /*
   std::cout << "Stopping Contention Free Period at "
   << Simulator::Now().GetSeconds()
   << std::endl;
+  */
   cfp->StopCFP();
 }
 
 static void OutputCFP(LiScanRun *cfp)
 {
-  cfp->OutputCFP();
+  Output output = cfp->OutputCFP();
+  std::ofstream myfile;
+  myfile.open ("example.txt",std::ios_base::app);
+  myfile << "Metrics: " << std::endl;
+  myfile << "Delay (ms): " << 0.001*output.m_delayMean << std::endl;
+  myfile << "Throughput (Mbps): " << output.m_throughput << std::endl;
+  myfile << "Overhead (ms): " << 0.001*output.m_overhead << std::endl;
+  myfile.close();
 }
 
 int
 main (int argc, char *argv[])
 {
 
-  uint32_t nSta = 2; //Number of stationary nodes
+  uint32_t nSta = 10; //Number of stationary nodes
   double errorRate = 0.02;
-  double simTime = 25;
+  double simTime = 100;
 
   Time::SetResolution(Time::US);
 
@@ -87,7 +100,7 @@ main (int argc, char *argv[])
     staNodes.push_back(temp);
   }
 
-  std::cout << "Run begins .." << std::endl;
+  //std::cout << "Run begins .." << std::endl;
 
   LiScanRun cfp(staNodes,apNode);
 

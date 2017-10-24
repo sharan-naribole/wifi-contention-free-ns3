@@ -9,7 +9,6 @@ class LiscanStaNode: public PhyNode {
 
 private:
   LiscanApNode* m_apNode;
-  Ptr<PPBPQueue> m_ppbp = CreateObject<PPBPQueue>();
   std::queue<Ptr<Packet>> m_reTxQueue;
   double m_delaySum = 0;
   uint32_t m_NPacketsTX = 0;
@@ -19,9 +18,9 @@ private:
   void PacketQueuePop();
   void ReceivePacket (Ptr<Packet> p, double snr, WifiTxVector txVector);
   void CheckACKRx();
-  void PhyRxEnd(Ptr< const Packet > packet);
 
 public:
+  Ptr<PPBPQueue> m_ppbp = CreateObject<PPBPQueue>();
   LiscanStaNode(LiscanApNode*, uint32_t, std::string, uint8_t, double);
   void PhyDownlinkSetup(WifiPhyStandard, Ptr<YansWifiChannel>, Ptr<ErrorRateModel>,
                         uint8_t);
@@ -129,9 +128,11 @@ void LiscanStaNode::PacketQueuePop()
       Send(m_ul, 0,aggPktSize);
       m_waitingACK = true;
       m_apNode -> m_ackId = m_nodeId;
+      /*
       std::cout << "Started Poll Reply Transmission at "
       << Simulator::Now().GetMicroSeconds()
       << " by Node " << m_nodeId << std::endl;
+      */
     }
 
     // Need to begin timer for ACK reception
@@ -152,14 +153,14 @@ void LiscanStaNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVect
 
   std::string msg = std::string((char*)buffer);
 
-
+  /*
   std::cout << "Node ID: " << m_nodeId
   << " RX header = " << destinationHeader.GetData()
   << " message = " << msg
   << " at "
   << Simulator::Now ().GetMicroSeconds ()
   << std::endl;
-
+  */
 
   if(destinationHeader.GetData() != m_nodeId)
   {
@@ -196,12 +197,11 @@ void LiscanStaNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVect
       m_nextTx = false;
       if(m_rem->IsCorrupt (p) == false)
       {
-        std::cout << "REQ received SUCCESS" << std::endl;
+        //std::cout << "REQ received SUCCESS" << std::endl;
         if(m_apNode->m_receiving == true)
         {
           m_nextTx = true;
-          std::cout << "Next in line: Node " << m_nodeId
-          << std::endl;
+          //std::cout << "Next in line: Node " << m_nodeId << std::endl;
         }
         else{
           PacketQueuePop();
@@ -210,20 +210,6 @@ void LiscanStaNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVect
     }
     //std::cout << "AP Rx status = " << m_apNode->m_receiving << std::end
     m_apNode -> TransmitPollRequest();
-  }
-}
-
-void LiscanStaNode::PhyRxEnd(Ptr< const Packet > packet)
-{
-  if(m_apNode->m_apIdleTimerStart == false)
-  {
-    m_apNode->m_apIdleTimerStart = true;
-    /*
-    std::cout << "RX ends at "
-    << Simulator::Now().GetMicroSeconds()
-    << std::endl;
-    */
-    m_apNode -> StartIdleTimer();
   }
 }
 
