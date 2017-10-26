@@ -1,4 +1,4 @@
- #include "ns3/core-module.h"
+#include "ns3/core-module.h"
 #include "ns3/simulator.h"
 #include "ns3/applications-module.h"
 #include <cmath>
@@ -29,10 +29,6 @@ PhyNode::GetTypeId (void)
   static TypeId tid = TypeId ("ns3::PhyNode")
     .SetParent<Object> ()
     .AddConstructor<PhyNode> ()
-    .AddAttribute ("Distance", "The distance from AP",
-             DoubleValue (5.0),
-             MakeDoubleAccessor (&PhyNode::m_distance),
-             MakeDoubleChecker<double> ())
 		.AddAttribute ("WiFiTxMode", "WifiMode for transmission",
 					   StringValue ("OfdmRate6Mbps"),
 					   MakeStringAccessor (&PhyNode::m_txMode),
@@ -45,22 +41,26 @@ PhyNode::GetTypeId (void)
 					   UintegerValue (0),
 					   MakeUintegerAccessor (&PhyNode::m_nodeId),
 					   MakeUintegerChecker<uint32_t> (1))
-    .AddAttribute ("IntfErrorRate", "Interference error rate",
-            DoubleValue (0.001),
-            MakeDoubleAccessor (&PhyNode::m_intfErrorRate),
+    .AddAttribute ("IntfErrorRateDL", "Interference error rate in downlink",
+            DoubleValue (0.000005),
+            MakeDoubleAccessor (&PhyNode::m_intfErrorRateDL),
+            MakeDoubleChecker<double> ())
+    .AddAttribute ("IntfErrorRateUL", "Interference error rate in uplink",
+            DoubleValue (0.000005),
+            MakeDoubleAccessor (&PhyNode::m_intfErrorRateUL),
             MakeDoubleChecker<double> ())
   ;
   return tid;
 }
 
 PhyNode::PhyNode (uint32_t nodeId, std::string txMode, uint8_t txPowerLevel,
-                  double distance)
-  : m_distance (distance),
+                  Vector loc)
+  : m_loc (loc),
     m_txMode (txMode),
     m_txPowerLevel(txPowerLevel),
     m_nodeId(nodeId)
 {
-   m_position->SetPosition (Vector (m_distance, 0.0, 0.0));
+   m_position->SetPosition (loc);
 
    WifiMode mode = WifiMode (txMode);
    WifiTxVector txVector;
@@ -91,6 +91,7 @@ void PhyNode::PhyUplinkSetup(WifiPhyStandard standard, Ptr<YansWifiChannel> chan
     m_ul->ConfigureStandard(standard);
     m_ul->SetChannel(channel);
     m_ul->SetChannelNumber(channelNumber);
+
     m_ul->SetErrorRateModel (error);
     m_ul->SetMobility(m_position);
   }
@@ -102,12 +103,24 @@ void PhyNode::PhyUplinkSetup(WifiPhyStandard standard, Ptr<YansWifiChannel> chan
 
 }
 
-void PhyNode::InterferenceSetup()
+void PhyNode::InterferenceDLSetup(double rate)
 {
-  Ptr<UniformRandomVariable> uniform = CreateObject<UniformRandomVariable> ();
-  m_rem->SetRandomVariable (uniform);
-  m_rem->SetRate (m_intfErrorRate);
-  m_rem->SetAttribute("ErrorUnit",EnumValue(RateErrorModel::ERROR_UNIT_PACKET));
+  m_rvDL->SetAttribute ("Min", DoubleValue (0));
+  m_rvDL->SetAttribute ("Max", DoubleValue (1));
+  m_intfErrorRateDL = rate;
+  m_remDL->SetRandomVariable (m_rvDL);
+  m_remDL->SetRate (m_intfErrorRateDL);
+  m_remDL->SetAttribute("ErrorUnit",EnumValue(RateErrorModel::ERROR_UNIT_PACKET));
+}
+
+void PhyNode::InterferenceULSetup(double rate)
+{
+  m_rvUL->SetAttribute ("Min", DoubleValue (0));
+  m_rvUL->SetAttribute ("Max", DoubleValue (1));
+  m_intfErrorRateUL = rate;
+  m_remUL->SetRandomVariable (m_rvUL);
+  m_remUL->SetRate (m_intfErrorRateUL);
+  m_remUL->SetAttribute("ErrorUnit",EnumValue(RateErrorModel::ERROR_UNIT_PACKET));
 }
 
 void
@@ -126,6 +139,10 @@ PhyNode::Send (Ptr<YansWifiPhy> m_tx, uint32_t nodeId, uint32_t packetSize)
   txVector.SetPreambleType (WIFI_PREAMBLE_LONG);
 
   m_tx->SendPacket (p, txVector);
+
+  Time txDuration = m_tx -> CalculateTxDuration(packetSize, txVector,
+                              m_tx->GetFrequency());
+  //std::cout << "TX duration: " << txDuration.GetMicroSeconds() << std::endl;
 }
 
 void
@@ -152,9 +169,13 @@ PhyNode::Send (Ptr<YansWifiPhy> m_tx, uint32_t nodeId, uint32_t packetSize,
   WifiTxVector txVector;
   txVector.SetTxPowerLevel (m_txPowerLevel);
   txVector.SetMode (mode);
-  txVector.SetPreambleType (WIFI_PREAMBLE_LONG);
+  txVector.SetPreambleType (WIFI_PREAMBLE_SHORT);
 
   m_tx->SendPacket (packet, txVector);
+
+  Time txDuration = m_tx -> CalculateTxDuration(packetSize, txVector,
+                              m_tx->GetFrequency());
+  //std::cout << "TX duration: " << txDuration.GetMicroSeconds() << std::endl;
 }
 
 void PhyNode::GetChannelNumbers()

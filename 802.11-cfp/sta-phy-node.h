@@ -21,7 +21,7 @@ private:
 
 public:
   Ptr<PPBPQueue> m_ppbp = CreateObject<PPBPQueue>();
-  StaPhyNode(ApPhyNode*, uint32_t, std::string, uint8_t, double);
+  StaPhyNode(ApPhyNode*, uint32_t, std::string, uint8_t, Vector);
   void PhyDownlinkSetup(WifiPhyStandard, Ptr<YansWifiChannel>, Ptr<ErrorRateModel>,
                         uint8_t);
   void PhyUplinkSetup(WifiPhyStandard, Ptr<YansWifiChannel>, Ptr<ErrorRateModel>,
@@ -34,8 +34,8 @@ public:
 };
 
 StaPhyNode::StaPhyNode(ApPhyNode* apNode, uint32_t nodeId, std::string txMode,
-                        uint8_t txPowerLevel, double distance)
-: PhyNode(nodeId, txMode, txPowerLevel, distance), m_apNode(apNode)
+                        uint8_t txPowerLevel, Vector loc)
+: PhyNode(nodeId, txMode, txPowerLevel, loc), m_apNode(apNode)
 {
   //m_ppbp = new PPBPGenerator(nodeId);
   m_ppbp -> SetNodeId(nodeId);
@@ -48,6 +48,7 @@ void StaPhyNode::PhyDownlinkSetup(WifiPhyStandard standard, Ptr<YansWifiChannel>
   m_dl->SetChannel(channel);
   m_dl->SetErrorRateModel (error);
   m_dl->SetChannelNumber(channelNumber);
+
   m_dl->SetMobility(m_position);
 
   m_dl->ConfigureStandard(standard);
@@ -71,6 +72,7 @@ void StaPhyNode::PhyUplinkSetup(WifiPhyStandard standard, Ptr<YansWifiChannel> c
     m_ul->ConfigureStandard(standard);
     m_ul->SetChannel(channel);
     m_ul->SetChannelNumber(channelNumber);
+
     m_ul->SetErrorRateModel (error);
     m_ul->SetMobility(m_position);
   }
@@ -145,13 +147,20 @@ void StaPhyNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVector)
   BasicHeader destinationHeader;
   p->RemoveHeader (destinationHeader);
 
+  uint8_t *buffer = new uint8_t[p->GetSize ()];
+  p->CopyData(buffer, p->GetSize ());
+
+  std::string msg = std::string((char*)buffer);
+
   /*
   std::cout << "Node ID: " << m_nodeId
   << " RX header = " << destinationHeader.GetData()
-  << " at "
+  << " msg = "
+  << msg << " at "
   << Simulator::Now ().GetMicroSeconds ()
   << std::endl;
   */
+
   if(m_waitingACK == true && destinationHeader.GetData() != m_nodeId)
   {
     m_ppbp -> PushQueue(m_reTxQueue);
@@ -169,11 +178,6 @@ void StaPhyNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVector)
     //We have to figure out if it is a Poll request
     //or an ACK frame. Accordingly, the packet queue
     // will pop the recently transmitted packets or not
-
-    uint8_t *buffer = new uint8_t[p->GetSize ()];
-    p->CopyData(buffer, p->GetSize ());
-
-    std::string msg = std::string((char*)buffer);
     //std::cout<<"Received: "<< msg << std::endl;
     if(msg == "ACK")
     {
@@ -186,14 +190,18 @@ void StaPhyNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVector)
     {
       // Works only if Poll Request is 100% successfully Transmitted
       // Otherwise Polling completely stops
-       m_apNode -> StartIdleTimer();
+       //m_apNode -> StartIdleTimer();
        //Extracting WiFi Socket
 
        // At this stage, I will check the Interference Model
-       if(m_rem->IsCorrupt (p) == false)
+       if(m_remDL->IsCorrupt (p) == false)
          {
            PacketQueuePop();
          }
+       else
+       {
+         //std::cout << "Poll request Dropped" << std::endl;
+       }
     }
   }
 }
@@ -208,7 +216,7 @@ void StaPhyNode::PhyRxEnd(Ptr< const Packet > packet)
     << Simulator::Now().GetMicroSeconds()
     << std::endl;
     */
-    m_apNode -> StartIdleTimer();
+    //m_apNode -> StartIdleTimer();
   }
 }
 

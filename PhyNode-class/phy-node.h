@@ -12,11 +12,12 @@ public:
   PhyNode();
   virtual ~PhyNode();
   static TypeId GetTypeId (void);
-  PhyNode (uint32_t, std::string, uint8_t, double);
-  void InterferenceSetup();
-  void PhyDownlinkSetup(WifiPhyStandard, Ptr<YansWifiChannel>, Ptr<ErrorRateModel>,
+  PhyNode (uint32_t, std::string, uint8_t, Vector);
+  void InterferenceDLSetup(double rate);
+  void InterferenceULSetup(double rate);
+  virtual void PhyDownlinkSetup(WifiPhyStandard, Ptr<YansWifiChannel>, Ptr<ErrorRateModel>,
                         uint8_t);
-  void PhyUplinkSetup(WifiPhyStandard, Ptr<YansWifiChannel>, Ptr<ErrorRateModel>,
+  virtual void PhyUplinkSetup(WifiPhyStandard, Ptr<YansWifiChannel>, Ptr<ErrorRateModel>,
                    uint8_t, bool);
   void Send (Ptr<YansWifiPhy>, uint32_t, uint32_t);
   void Send (Ptr<YansWifiPhy>, uint32_t, uint32_t, std::string);
@@ -26,15 +27,19 @@ public:
   Ptr<YansWifiPhy> m_ul = CreateObject<YansWifiPhy> ();
 
 protected:
-  double m_distance; ///< distance
+  Vector m_loc; ///< distance
   std::string m_txMode; ///< transmit mode; Modulation
   uint8_t m_txPowerLevel; ///< transmit power level
   uint32_t m_nodeId;
   uint64_t m_datarate;
-  double m_intfErrorRate;
+  double m_intfErrorRateDL;
+  double m_intfErrorRateUL;
   bool m_multiband = false;
   uint8_t m_dlChannelNumber;
   uint8_t m_ulChannelNumber;
   Ptr<MobilityModel> m_position = CreateObject<ConstantPositionMobilityModel> ();
-  Ptr<RateErrorModel> m_rem = CreateObject<RateErrorModel> ();
+  Ptr<UniformRandomVariable> m_rvDL = CreateObject<UniformRandomVariable> ();
+  Ptr<UniformRandomVariable> m_rvUL = CreateObject<UniformRandomVariable> ();
+  Ptr<RateErrorModel> m_remDL = CreateObject<RateErrorModel> ();
+  Ptr<RateErrorModel> m_remUL = CreateObject<RateErrorModel> ();
 };
