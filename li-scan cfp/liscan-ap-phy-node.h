@@ -13,7 +13,7 @@ class LiscanApNode: public PhyNode {
 public:
   LiscanApNode();
   virtual ~LiscanApNode();
-  LiscanApNode(uint32_t, std::string, uint8_t, double);
+  LiscanApNode(uint32_t, std::string, uint8_t, Vector);
   void PhyDownlinkSetup(WifiPhyStandard, Ptr<YansWifiChannel>, Ptr<ErrorRateModel>,
                         uint8_t);
   void PhyUplinkSetup(WifiPhyStandard, Ptr<YansWifiChannel>, Ptr<ErrorRateModel>,
@@ -63,8 +63,8 @@ LiscanApNode::~LiscanApNode ()
 }
 
 LiscanApNode::LiscanApNode(uint32_t nodeId, std::string txMode, uint8_t txPowerLevel,
-  double distance)
-: PhyNode(nodeId, txMode, txPowerLevel, distance)
+  Vector loc)
+: PhyNode(nodeId, txMode, txPowerLevel, loc)
 {
 }
 
@@ -131,26 +131,17 @@ void LiscanApNode::TransmitPollRequest()
 
   if(m_stop == false && m_receiving == false)
   {
-    /*
-    std::cout << "Station = " << m_staIndex << " out of "
-    << m_nSta << std::endl;
-    */
+    //std::cout << "Station = " << m_staIndex << " out of "
+    //<< m_nSta << std::endl;
+
 
     Send(m_dl,m_staIndex, pollSize, "REQ"); // Poll Request
+
     /*
-    std::cout << "Transmitting poll request at "
-    << Simulator::Now ().GetMicroSeconds ()
+    std::cout << "Transmitting poll request to Node "
+    << m_staIndex << " at " << Simulator::Now ().GetMicroSeconds ()
     << std::endl;
     */
-
-    //Time pollTxTime (MicroSeconds ((double)(pollSize* 8.0*1000000) /((double) m_datarate)));
-
-    // Need to change this based on poll TX Time
-    //m_overhead += pollTxTime; // from Globals
-    //std::cout << "Waiting time = " << pollTxTime + (MicroSeconds(PIFS))
-    //<< std::endl;
-
-    //Simulator::Schedule(pollTxTime + (MicroSeconds(PIFS)) + MicroSeconds(0), &LiscanApNode::CheckIdle, this);
 
     m_prevIndex = m_staIndex;
     if(m_staIndex == m_nSta)
@@ -166,36 +157,23 @@ void LiscanApNode::TransmitPollRequest()
 
 void LiscanApNode::ReceivePollReply (Ptr<Packet> p, double snr, WifiTxVector txVector)
 {
-  // At this stage, I will check the Interference Model
-  if(m_rem->IsCorrupt (p) == false)
+  BasicHeader destinationHeader;
+  p->RemoveHeader (destinationHeader);
+
+  if(destinationHeader.GetData() == 0)
   {
-    BasicHeader destinationHeader;
-    p->RemoveHeader (destinationHeader);
+    /*
+    std::cout << "Received poll reply by Node "
+    << destinationHeader.GetData() << " of size "
+    << p->GetSize() << " at "
+    << Simulator::Now().GetMicroSeconds()
+    << std::endl;
+    */
+    m_rxBytes += p->GetSize();
 
-    if(destinationHeader.GetData() == 0)
-    {
-      /*
-      std::cout << "Received poll reply by Node "
-      << destinationHeader.GetData() << " of size "
-      << p->GetSize() << " at "
-      << Simulator::Now().GetMicroSeconds()
-      << std::endl;
-      */
+    Simulator::Schedule(MicroSeconds(decodeDelay),&LiscanApNode::TransmitACK,this, "ACK");
 
-      m_rxBytes += p->GetSize();
-
-      Simulator::Schedule(MicroSeconds(decodeDelay),&LiscanApNode::TransmitACK,this, "ACK");
-
-      //Simulator::Schedule(MicroSeconds(PIFS),&LiscanApNode::TransmitPollRequest,this);
-    }
-  }
-  else
-  {
-    m_staIndex = m_prevIndex;
-    m_overhead += pollTxTime;
-    Simulator::Schedule(MicroSeconds(decodeDelay),&LiscanApNode::TransmitPollRequest,this);
-    //Simulator::Schedule(MicroSeconds(SIFS),&LiscanApNode::TransmitACK,this, "NACK");
-    //m_staNodes[m_prevIndex]->NACK();
+    //Simulator::Schedule(MicroSeconds(PIFS),&LiscanApNode::TransmitPollRequest,this);
   }
 }
 

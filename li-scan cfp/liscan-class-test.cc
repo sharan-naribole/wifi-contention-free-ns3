@@ -6,6 +6,7 @@
 #include "ns3/propagation-loss-model.h"
 #include "ns3/propagation-delay-model.h"
 #include "ns3/nist-error-rate-model.h"
+#include "ns3/position-allocator.h"
 #include "output.h"
 #include <fstream>
 
@@ -45,10 +46,10 @@ static void OutputCFP(LiScanRun *cfp)
   Output output = cfp->OutputCFP();
   std::ofstream myfile;
   myfile.open ("example.txt",std::ios_base::app);
-  myfile << "Metrics: " << std::endl;
-  myfile << "Delay (ms): " << 0.001*output.m_delayMean << std::endl;
+  //myfile << "Metrics: " << std::endl;
+  myfile << "Delay (ms): " << output.m_delayMean << std::endl;
   myfile << "Throughput (Mbps): " << output.m_throughput << std::endl;
-  myfile << "Overhead (ms): " << 0.001*output.m_overhead << std::endl;
+  myfile << "Overhead (ms): " << output.m_overhead << std::endl;
   myfile.close();
 }
 
@@ -56,8 +57,8 @@ int
 main (int argc, char *argv[])
 {
 
-  uint32_t nSta = 10; //Number of stationary nodes
-  double errorRate = 0.02;
+  uint32_t nSta = 2; //Number of stationary nodes
+  double errorRate = 0.3;
   double simTime = 100;
 
   Time::SetResolution(Time::US);
@@ -67,7 +68,6 @@ main (int argc, char *argv[])
 
   // Enable the packet printing through Packet::Print command.
   Packet::EnablePrinting ();
-  double distance = 5;
   WifiPhyStandard standard = WIFI_PHY_STANDARD_80211a;
   uint8_t downlinkChannelNumber = 1;
   uint8_t uplinkChannelNumber = 4;
@@ -84,19 +84,27 @@ main (int argc, char *argv[])
   Ptr<ErrorRateModel> error = CreateObject<NistErrorRateModel> ();
 
   LiscanApNode* apNode;
-  apNode = new LiscanApNode(0, "OfdmRate18Mbps",0, 0);
+  apNode = new LiscanApNode(0, "OfdmRate18Mbps",0, Vector(0,0,0));
   apNode->PhyDownlinkSetup(standard, dlChannel, error,downlinkChannelNumber);
   apNode->PhyUplinkSetup(standard, ulChannel, error,uplinkChannelNumber, true);
-  apNode->InterferenceSetup(errorRate);
+  apNode->InterferenceDLSetup(0.1*errorRate);
+  apNode->InterferenceULSetup(errorRate);
+
+  Ptr<RandomDiscPositionAllocator> location = CreateObject<RandomDiscPositionAllocator>();
+  location -> SetAttribute("Rho", StringValue("ns3::UniformRandomVariable[Min=0.0|Max=25.0]"));
 
   std::vector<LiscanStaNode*> staNodes;
   for(uint32_t i = 0; i < nSta; i++)
   {
     LiscanStaNode* temp;
-    temp = new LiscanStaNode(apNode, i+1, "OfdmRate54Mbps", 0, distance*pow(-1,i));
+    Vector loc = location -> GetNext();
+    std::cout << loc << std::endl;
+    temp = new LiscanStaNode(apNode, i+1, "OfdmRate54Mbps", 0, loc);
     temp->PhyDownlinkSetup(standard, dlChannel, error,downlinkChannelNumber);
     temp->PhyUplinkSetup(standard, ulChannel, error,uplinkChannelNumber, true);
-    temp->InterferenceSetup(errorRate);
+    temp->m_ppbp->SetAttribute("MeanBurstArrivals",DoubleValue(100));
+    temp->InterferenceDLSetup(0.01*errorRate);
+    temp->InterferenceULSetup(errorRate);
     staNodes.push_back(temp);
   }
 

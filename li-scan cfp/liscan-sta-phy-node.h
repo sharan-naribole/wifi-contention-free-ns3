@@ -21,7 +21,7 @@ private:
 
 public:
   Ptr<PPBPQueue> m_ppbp = CreateObject<PPBPQueue>();
-  LiscanStaNode(LiscanApNode*, uint32_t, std::string, uint8_t, double);
+  LiscanStaNode(LiscanApNode*, uint32_t, std::string, uint8_t, Vector);
   void PhyDownlinkSetup(WifiPhyStandard, Ptr<YansWifiChannel>, Ptr<ErrorRateModel>,
                         uint8_t);
   void PhyUplinkSetup(WifiPhyStandard, Ptr<YansWifiChannel>, Ptr<ErrorRateModel>,
@@ -33,8 +33,8 @@ public:
 };
 
 LiscanStaNode::LiscanStaNode(LiscanApNode* apNode, uint32_t nodeId, std::string txMode,
-                        uint8_t txPowerLevel, double distance)
-: PhyNode(nodeId, txMode, txPowerLevel, distance), m_apNode(apNode)
+                        uint8_t txPowerLevel, Vector loc)
+: PhyNode(nodeId, txMode, txPowerLevel, loc), m_apNode(apNode)
 {
   //m_ppbp = new PPBPGenerator(nodeId);
   m_ppbp -> SetNodeId(nodeId);
@@ -92,24 +92,19 @@ void LiscanStaNode::StopTraffic()
 
 void LiscanStaNode::PacketQueuePop()
 {
-   uint32_t Npackets = m_ppbp->m_packetQueue.size();
-
-    if(Npackets > 0)
+  uint32_t Npackets = m_ppbp->m_packetQueue.size();
+  if(Npackets > 0)
+  {
+    if(m_rvUL->GetValue() > m_remUL->GetRate())
     {
       m_reTxQueue = m_ppbp->m_packetQueue;
-    //Transmitting Poll reply
+      //Transmitting Poll reply
 
-    /*
-    std::cout << "Transmitting "
-    << Npackets << " packets by Node "
-    << m_nodeId<< " at "
-    << Simulator::Now ().GetMicroSeconds ()
-    << std::endl;
-    */
-
-    //m_apNode -> m_receiving = true;
-    //std::cout << "AP's RX status changed to true at "
-    //<< Simulator::Now().GetMicroSeconds() << std::endl;
+      std::cout << "Transmitting "
+      << Npackets << " packets by Node "
+      << m_nodeId<< " at "
+      << Simulator::Now ().GetMicroSeconds ()
+      << std::endl;
 
       uint32_t aggPktSize = 0;
       //std::cout << "Queue size = "
@@ -128,19 +123,18 @@ void LiscanStaNode::PacketQueuePop()
       Send(m_ul, 0,aggPktSize);
       m_waitingACK = true;
       m_apNode -> m_ackId = m_nodeId;
+
       /*
       std::cout << "Started Poll Reply Transmission at "
       << Simulator::Now().GetMicroSeconds()
       << " by Node " << m_nodeId << std::endl;
       */
     }
-
-    // Need to begin timer for ACK reception
-    // If no ACK, retransmission queue won't be cleared
-    // Those packets will be pushed back into main queue
-    // with new generated Timestamps
-    //Time pollReplyTxTime (MicroSeconds ((double)(aggPktSize* 8.0*1000000) /((double) m_datarate)));
-    //Simulator::Schedule(pollReplyTxTime + (MicroSeconds(SIFS + ACKTimeout)), &StaPhyNode::CheckACKRx, this);
+    else
+    {
+      std::cout << "Aborted Poll Reply Transmission" << std::endl;
+    }
+  }
 }
 
 void LiscanStaNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVector)
@@ -195,7 +189,7 @@ void LiscanStaNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVect
     else if(msg == "REQ")
     {
       m_nextTx = false;
-      if(m_rem->IsCorrupt (p) == false)
+      if(m_remDL->IsCorrupt (p) == false)
       {
         //std::cout << "REQ received SUCCESS" << std::endl;
         if(m_apNode->m_receiving == true)
@@ -206,6 +200,10 @@ void LiscanStaNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVect
         else{
           PacketQueuePop();
         }
+      }
+      else
+      {
+        std::cout << "Poll Request Dropped" << std::endl;
       }
     }
     //std::cout << "AP Rx status = " << m_apNode->m_receiving << std::end
