@@ -23,6 +23,7 @@ class LiScanRun
     LiscanApNode* m_apNode;
     std::string filename;
 
+    LiScanRun();
     LiScanRun(std::vector<LiscanStaNode*> staNodes,
     LiscanApNode* apNode);
     ~LiScanRun();
@@ -30,6 +31,11 @@ class LiScanRun
     void StopCFP();
     Output OutputCFP();
 };
+
+LiScanRun::LiScanRun()
+{
+
+}
 
 LiScanRun::LiScanRun(std::vector<LiscanStaNode*> staNodes,
 LiscanApNode* apNode)
@@ -91,6 +97,8 @@ Output LiScanRun::OutputCFP()
     // milliseconds
     m_output.m_delayMean = (double) 0.001*delaySum / (double) NpacketsTotal;
   }
+
+  m_output.m_rxBytes = m_apNode -> GetRxBytes();
 
   return m_output;
   //std::cout << "Metrics: " << std::endl;

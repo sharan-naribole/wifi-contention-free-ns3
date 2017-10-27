@@ -22,6 +22,7 @@ public:
   void StopPolling();
   double GetOverhead();
   double GetThroughput();
+  uint32_t GetRxBytes();
 
 private:
   uint32_t m_staIndex;
@@ -32,7 +33,7 @@ private:
   bool m_receiving = false;
   bool m_apIdleTimerStart = false;
 
-  double m_overhead = 0;
+  double m_overhead = -1*pollTxTime;
   uint32_t m_rxBytes = 0;
   double m_runTime;
   double m_throughput;
@@ -157,23 +158,33 @@ void LiscanApNode::TransmitPollRequest()
 
 void LiscanApNode::ReceivePollReply (Ptr<Packet> p, double snr, WifiTxVector txVector)
 {
-  BasicHeader destinationHeader;
-  p->RemoveHeader (destinationHeader);
-
-  if(destinationHeader.GetData() == 0)
+  // At this stage, I will check the Interference Model
+  if(m_remUL->IsCorrupt (p) == false)
   {
-    /*
-    std::cout << "Received poll reply by Node "
-    << destinationHeader.GetData() << " of size "
-    << p->GetSize() << " at "
-    << Simulator::Now().GetMicroSeconds()
-    << std::endl;
-    */
-    m_rxBytes += p->GetSize();
+    BasicHeader destinationHeader;
+    p->RemoveHeader (destinationHeader);
 
-    Simulator::Schedule(MicroSeconds(decodeDelay),&LiscanApNode::TransmitACK,this, "ACK");
+    if(destinationHeader.GetData() == 0)
+    {
+      /*
+      std::cout << "Received poll reply by Node "
+      << destinationHeader.GetData() << " of size "
+      << p->GetSize() << " at "
+      << Simulator::Now().GetMicroSeconds()
+      << std::endl;
+      */
 
-    //Simulator::Schedule(MicroSeconds(PIFS),&LiscanApNode::TransmitPollRequest,this);
+      m_rxBytes += p->GetSize();
+
+      Simulator::Schedule(MicroSeconds(decodeDelay),&LiscanApNode::TransmitACK,this, "ACK");
+
+      //Simulator::Schedule(MicroSeconds(PIFS),&LiscanApNode::TransmitPollRequest,this);
+    }
+  }
+  else
+  {
+    Simulator::Schedule(MicroSeconds(decodeDelay),&LiscanApNode::TransmitACK,this, "NACK");
+    m_overhead += ACKTxTime;
   }
 }
 
@@ -201,10 +212,16 @@ double LiscanApNode::GetOverhead()
   return m_overhead;
 }
 
+uint32_t LiscanApNode::GetRxBytes()
+{
+  return m_rxBytes;
+}
+
 void LiscanApNode::PhyRxBegin(Ptr< const Packet > packet)
 {
   //std::cout << "Started Poll Reply Reception at "
   //<< Simulator::Now().GetMicroSeconds() << std::endl;
+
   Simulator::Schedule(MicroSeconds(3), &LiscanApNode::ReceptionState,this);
 }
 

@@ -100,11 +100,13 @@ void LiscanStaNode::PacketQueuePop()
       m_reTxQueue = m_ppbp->m_packetQueue;
       //Transmitting Poll reply
 
+      /*
       std::cout << "Transmitting "
       << Npackets << " packets by Node "
       << m_nodeId<< " at "
       << Simulator::Now ().GetMicroSeconds ()
       << std::endl;
+      */
 
       uint32_t aggPktSize = 0;
       //std::cout << "Queue size = "
@@ -125,6 +127,9 @@ void LiscanStaNode::PacketQueuePop()
       m_apNode -> m_ackId = m_nodeId;
 
       /*
+      std::cout << "Queue size after popping: "
+      << m_ppbp -> m_packetQueue.size() << std::endl;
+
       std::cout << "Started Poll Reply Transmission at "
       << Simulator::Now().GetMicroSeconds()
       << " by Node " << m_nodeId << std::endl;
@@ -132,8 +137,11 @@ void LiscanStaNode::PacketQueuePop()
     }
     else
     {
-      std::cout << "Aborted Poll Reply Transmission" << std::endl;
+      //std::cout << "Aborted Poll Reply Transmission" << std::endl;
     }
+  }
+  else
+  {
   }
 }
 
@@ -158,7 +166,7 @@ void LiscanStaNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVect
 
   if(destinationHeader.GetData() != m_nodeId)
   {
-    if(m_waitingACK == true)
+    if(m_waitingACK == true && !m_ul -> IsStateTx())
     {
       m_ppbp -> PushQueue(m_reTxQueue);
       //std::cout << "NACK received" << std::endl;
@@ -166,10 +174,22 @@ void LiscanStaNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVect
       std::queue<Ptr<Packet>> temp;
       temp.swap(m_reTxQueue);
       m_waitingACK = false;
+
+      /*
+      std::cout << "ReTx Queue size after No ACK: "
+      << m_reTxQueue.size() << std::endl;
+      std::cout << "Main Queue size after No ACK: "
+      << m_ppbp -> m_packetQueue.size() << std::endl;
+      */
     }
-    else if(msg == "ACK" && m_nextTx == true)
+    else if(m_nextTx == true)
     {
-      PacketQueuePop();
+      m_nextTx = false;
+      if(msg == "ACK" || msg == "NACK")
+      {
+        PacketQueuePop();
+      }
+      //std::cout << "Next in line's TX begins" << std::endl;
     }
   }
   else
@@ -185,6 +205,13 @@ void LiscanStaNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVect
       // Clearing the retransmission queue on receiving ACK
       std::queue<Ptr<Packet>> temp;
       temp.swap(m_reTxQueue);
+
+      /*
+      std::cout << "ReTx Queue size after ACK: "
+      << m_reTxQueue.size() << std::endl;
+      std::cout << "Main Queue size after ACK: "
+      << m_ppbp -> m_packetQueue.size() << std::endl;
+      */
     }
     else if(msg == "REQ")
     {
@@ -198,12 +225,17 @@ void LiscanStaNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVect
           //std::cout << "Next in line: Node " << m_nodeId << std::endl;
         }
         else{
+          m_apNode -> m_overhead += pollTxTime;
           PacketQueuePop();
         }
       }
       else
       {
-        std::cout << "Poll Request Dropped" << std::endl;
+        if(m_apNode -> m_receiving == false)
+        {
+          m_apNode -> m_overhead += pollTxTime;
+        }
+        //std::cout << "Poll Request Dropped" << std::endl;
       }
     }
     //std::cout << "AP Rx status = " << m_apNode->m_receiving << std::end
