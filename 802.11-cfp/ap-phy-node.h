@@ -22,6 +22,7 @@ public:
   void StopPolling();
   double GetOverhead();
   double GetThroughput();
+  uint32_t GetRxBytes();
 
 private:
   uint32_t m_staIndex;
@@ -161,24 +162,32 @@ void ApPhyNode::TransmitPollRequest()
 void ApPhyNode::ReceivePollReply (Ptr<Packet> p, double snr, WifiTxVector txVector)
 {
   // At this stage, I will check the Interference Model
-  BasicHeader destinationHeader;
-  p->RemoveHeader (destinationHeader);
-
-  if(destinationHeader.GetData() == 0)
+  if(m_remUL->IsCorrupt (p) == false)
   {
-    /*
-    std::cout << "Received poll reply by Node "
-    << destinationHeader.GetData() << " of size "
-    << p->GetSize() << " at "
-    << Simulator::Now().GetMicroSeconds()
-    << std::endl;
-    */
+    // At this stage, I will check the Interference Model
+    BasicHeader destinationHeader;
+    p->RemoveHeader (destinationHeader);
 
-    m_rxBytes += p->GetSize();
+    if(destinationHeader.GetData() == 0)
+    {
+      /*
+      std::cout << "Received poll reply by Node "
+      << destinationHeader.GetData() << " of size "
+      << p->GetSize() << " at "
+      << Simulator::Now().GetMicroSeconds()
+      << std::endl;
+      */
 
-    Simulator::Schedule(MicroSeconds(SIFS),&ApPhyNode::TransmitACK,this, "ACK");
-    m_overhead += (SIFS - decodeDelay); // after Packet reception, switching from
-                                        // RX to TX
+      m_rxBytes += p->GetSize();
+
+      Simulator::Schedule(MicroSeconds(SIFS),&ApPhyNode::TransmitACK,this, "ACK");
+      m_overhead += (SIFS - decodeDelay); // after Packet reception, switching from
+                                          // RX to TX
+    }
+  }
+  else
+  {
+    Simulator::Schedule(MicroSeconds(SIFS),&ApPhyNode::TransmitPollRequest,this);
   }
 }
 
@@ -229,6 +238,11 @@ double ApPhyNode::GetThroughput()
 double ApPhyNode::GetOverhead()
 {
   return m_overhead;
+}
+
+uint32_t ApPhyNode::GetRxBytes()
+{
+  return m_rxBytes;
 }
 
 void ApPhyNode::PhyRxBegin(Ptr< const Packet > packet)
