@@ -17,7 +17,6 @@ private:
   void PacketQueuePop();
   void ReceivePacket (Ptr<Packet> p, double snr, WifiTxVector txVector);
   void CheckACKRx();
-  void PhyRxEnd(Ptr< const Packet > packet);
 
 public:
   Ptr<PPBPQueue> m_ppbp = CreateObject<PPBPQueue>();
@@ -60,7 +59,7 @@ void StaPhyNode::PhyDownlinkSetup(WifiPhyStandard standard, Ptr<YansWifiChannel>
   txVector.SetPreambleType (WIFI_PREAMBLE_LONG);
 
   m_dl -> SetReceiveOkCallback(MakeCallback(&StaPhyNode::ReceivePacket,this));
-  //m_dl -> TraceConnectWithoutContext("PhyRxEnd", MakeCallback(&StaPhyNode::PhyRxEnd,this));
+  //m_dl -> TraceConnectWithoutContext("PhyRxBegin", MakeCallback(&StaPhyNode::PhyRxBegin,this));
 }
 
 void StaPhyNode::PhyUplinkSetup(WifiPhyStandard standard, Ptr<YansWifiChannel> channel,
@@ -184,7 +183,6 @@ void StaPhyNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVector)
       // Clearing the retransmission queue on receiving ACK
       std::queue<Ptr<Packet>> temp;
       temp.swap(m_reTxQueue);
-      m_apNode->TransmitPollRequest();
     }
     else if( msg == "REQ")
     {
@@ -206,19 +204,6 @@ void StaPhyNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVector)
   }
 }
 
-void StaPhyNode::PhyRxEnd(Ptr< const Packet > packet)
-{
-  if(m_apNode->m_apIdleTimerStart == false)
-  {
-    m_apNode->m_apIdleTimerStart = true;
-    /*
-    std::cout << "RX ends at "
-    << Simulator::Now().GetMicroSeconds()
-    << std::endl;
-    */
-    //m_apNode -> StartIdleTimer();
-  }
-}
 
 double StaPhyNode::GetDelaySum()
 {

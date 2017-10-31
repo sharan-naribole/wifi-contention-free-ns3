@@ -29,7 +29,6 @@ private:
   uint32_t m_prevIndex;
   uint32_t m_nSta;
   bool m_stop = false;
-  bool m_receiving = false;
   bool m_apIdleTimerStart = false;
 
   double m_overhead = 0;
@@ -46,9 +45,9 @@ private:
   void CheckIdle();
   void StartIdleTimer();
   void PhyRxBegin(Ptr< const Packet > packet);
-  void PhyTxEnd(Ptr< const Packet > packet);
+  void PhyRxDrop(Ptr< const Packet > packet);
   void RxAbort();
-
+  void CheckBusy();
 
   friend class StaPhyNode;
 };
@@ -81,7 +80,6 @@ void ApPhyNode::PhyDownlinkSetup(WifiPhyStandard standard, Ptr<YansWifiChannel> 
 
   m_dl->ConfigureStandard(standard);
 
-  m_dl -> TraceConnectWithoutContext("PhyTxEnd", MakeCallback(&ApPhyNode::PhyTxEnd,this));
 }
 
 void ApPhyNode::PhyUplinkSetup(WifiPhyStandard standard, Ptr<YansWifiChannel> channel,
@@ -104,6 +102,7 @@ void ApPhyNode::PhyUplinkSetup(WifiPhyStandard standard, Ptr<YansWifiChannel> ch
 
   m_ul -> SetReceiveOkCallback(MakeCallback(&ApPhyNode::ReceivePollReply,this));
   m_ul -> TraceConnectWithoutContext("PhyRxBegin", MakeCallback(&ApPhyNode::PhyRxBegin,this));
+  m_dl -> TraceConnectWithoutContext("PhyRxDrop", MakeCallback(&ApPhyNode::PhyRxDrop,this));
 }
 
 void ApPhyNode::StartPolling(uint32_t staIndex, uint32_t nSta)
@@ -133,9 +132,16 @@ void ApPhyNode::TransmitPollRequest()
   {
     //std::cout << "Station = " << m_staIndex << " out of "
     //<< m_nSta << std::endl;
-
-    m_receiving = false;
+    /*
+    std::cout << m_ul -> IsStateCcaBusy() << std::endl;
+    std::cout << m_ul -> IsStateBusy() << std::endl;
+    std::cout << m_ul -> IsStateIdle() << std::endl;
+    std::cout << m_ul -> IsStateTx() << std::endl;
+    std::cout << m_ul -> IsStateRx() << std::endl;
+    std::cout << m_ul -> IsStateSwitching() << std::endl;
+    */
     Send(m_dl,m_staIndex, pollSize, "REQ"); // Poll Request
+
     /*
     std::cout << "Transmitting poll request to Node "
     << m_staIndex << " at " << Simulator::Now ().GetMicroSeconds ()
@@ -194,22 +200,22 @@ void ApPhyNode::ReceivePollReply (Ptr<Packet> p, double snr, WifiTxVector txVect
 void ApPhyNode::TransmitACK(std::string message)
 {
   Send(m_dl,m_prevIndex, ACKSize, message);
+  Simulator::Schedule(MicroSeconds(ACKTxTime),&ApPhyNode::TransmitPollRequest,this);
+
 
   //std::cout << "Transmitted " << message << " at "
   //<< Simulator::Now ().GetMicroSeconds ()
   //<< std::endl;
 
   //Time ACKTxTime (MicroSeconds ((double)(ACKSize* 8.0*1000000) /((double) m_datarate)));
-  //Simulator::Schedule(MicroSeconds((double)1.2*ACKTxTime),&ApPhyNode::TransmitPollRequest,this);
 }
 
 void ApPhyNode::CheckIdle()
 {
-  /*
-  std::cout << "Checking idle at "
-  << Simulator::Now().GetMicroSeconds() << std::endl;
-  */
-  if(m_receiving == false)
+  //std::cout << "Checking idle at "
+  //<< Simulator::Now().GetMicroSeconds() << std::endl;
+
+  if(m_apIdleTimerStart)
   {
     m_overhead += PIFS;
     //std::cout << "Calling TransmitPollRequest()" << std::endl;
@@ -223,10 +229,9 @@ void ApPhyNode::CheckIdle()
 
 void ApPhyNode::StartIdleTimer()
 {
-  /*
-  std::cout << "Started Idle Timer at "
-  << Simulator::Now().GetMicroSeconds() << std::endl;
-  */
+  //std::cout << "Started Idle Timer at "
+  //<< Simulator::Now().GetMicroSeconds() << std::endl;
+  m_apIdleTimerStart = true;
   Simulator::Schedule(MicroSeconds(PIFS), &ApPhyNode::CheckIdle, this);
 }
 
@@ -249,22 +254,27 @@ void ApPhyNode::PhyRxBegin(Ptr< const Packet > packet)
 {
   if(m_rvUL->GetValue() < m_remUL->GetRate())
   {
-    m_receiving = false;
     Simulator::Schedule(MicroSeconds(preambleDetection),&ApPhyNode::RxAbort,this);
   }
   else
   {
     //std::cout << "Started Poll Reply Reception at "
     //<< Simulator::Now().GetMicroSeconds() << std::endl;
-    m_receiving = true;
+    m_apIdleTimerStart = false;
   }
 
 }
 
-void ApPhyNode::PhyTxEnd(Ptr< const Packet > packet)
+void ApPhyNode::PhyRxDrop(Ptr< const Packet > packet)
 {
-  //std::cout << "Poll Reply Transmission ends at "
+  //std::cout << "Poll Reply Dropped  at "
   //<< Simulator::Now().GetMicroSeconds() << std::endl;
+
+  //std::cout << m_ul -> IsStateCcaBusy() << std::endl;
+  //std::cout << m_ul -> IsStateBusy() << std::endl;
+  //std::cout << m_ul -> IsStateIdle() << std::endl;
+
+  CheckBusy();
 }
 
 void ApPhyNode::RxAbort()
@@ -272,6 +282,32 @@ void ApPhyNode::RxAbort()
   //std::cout << "Aborted Poll Reply Reception at "
   //<< Simulator::Now().GetMicroSeconds() << std::endl;
   m_ul -> AbortCurrentReception();
+}
+
+void ApPhyNode::CheckBusy()
+{
+  if(m_ul -> IsStateBusy())
+  {
+    Simulator::Schedule(MicroSeconds(SIFS), &ApPhyNode::CheckBusy, this);
+  }
+  else
+  {
+    if(m_ul -> IsStateIdle())
+    {
+      //std::cout << "Entered Idle state at "
+      //<< Simulator::Now().GetMicroSeconds() << std::endl;
+
+      if(m_apIdleTimerStart == false)
+      {
+        TransmitPollRequest();
+      }
+
+    }
+    else
+    {
+      Simulator::Schedule(MicroSeconds(SIFS), &ApPhyNode::CheckBusy, this);
+    }
+  }
 }
 
 #endif

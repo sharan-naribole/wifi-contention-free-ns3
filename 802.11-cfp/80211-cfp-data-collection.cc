@@ -1,6 +1,6 @@
 #include "ns3/core-module.h"
 #include "ns3/network-module.h"
-#include "liscan-run.h"
+#include "cfp-phy-base.h"
 #include <cmath>
 #include "ns3/yans-wifi-channel.h"
 #include "ns3/propagation-loss-model.h"
@@ -27,7 +27,7 @@ private:
   double m_errorRate; // For Wi-Fi uplink
   uint32_t m_clientSize;
   double m_simTime;
-  LiScanRun m_cfp;
+  CFPPhyBase m_cfp;
   std::string m_filename;
 
   void Stop();
@@ -45,7 +45,7 @@ void Experiment::Setup()
 {
   WifiPhyStandard standard = WIFI_PHY_STANDARD_80211a;
   uint8_t downlinkChannelNumber = 1;
-  uint8_t uplinkChannelNumber = 4;
+  uint8_t uplinkChannelNumber = 1;
 
   Ptr<YansWifiChannel> dlChannel = CreateObject<YansWifiChannel> ();
   dlChannel->SetPropagationDelayModel (CreateObject<ConstantSpeedPropagationDelayModel> ());
@@ -58,14 +58,14 @@ void Experiment::Setup()
   ulChannel->SetPropagationLossModel (log);
   Ptr<ErrorRateModel> error = CreateObject<NistErrorRateModel> ();
 
-  LiscanApNode* apNode;
-  apNode = new LiscanApNode(0, "OfdmRate18Mbps",0, Vector(0,0,0));
+  ApPhyNode* apNode;
+  apNode = new ApPhyNode(0, "OfdmRate18Mbps",0, Vector(0,0,0));
   apNode->PhyDownlinkSetup(standard, dlChannel, error,downlinkChannelNumber);
-  apNode->PhyUplinkSetup(standard, ulChannel, error,uplinkChannelNumber, true);
-  apNode->InterferenceDLSetup(0.01); // fixed for VLC
+  apNode->PhyUplinkSetup(standard, ulChannel, error,uplinkChannelNumber, false);
+  apNode->InterferenceDLSetup(m_errorRate); // fixed for VLC
   apNode->InterferenceULSetup(m_errorRate); // UL Wi-Fi
 
-  std::vector<LiscanStaNode*> staNodes;
+  std::vector<StaPhyNode*> staNodes;
   std::vector<uint32_t> trafficClassifier = TrafficClassifier();
 
   Ptr<RandomDiscPositionAllocator> location = CreateObject<RandomDiscPositionAllocator>();
@@ -73,13 +73,13 @@ void Experiment::Setup()
 
   for(uint32_t i = 0; i < m_clientSize; i++)
   {
-    LiscanStaNode* temp;
+    StaPhyNode* temp;
     Vector loc = location -> GetNext();
     //std::cout << loc << std::endl;
-    temp = new LiscanStaNode(apNode, i+1, "OfdmRate54Mbps", 0, loc);
+    temp = new StaPhyNode(apNode, i+1, "OfdmRate54Mbps", 0, loc);
     temp->PhyDownlinkSetup(standard, dlChannel, error,downlinkChannelNumber);
-    temp->PhyUplinkSetup(standard, ulChannel, error,uplinkChannelNumber, true);
-    temp->InterferenceDLSetup(0.01);
+    temp->PhyUplinkSetup(standard, ulChannel, error,uplinkChannelNumber, false);
+    temp->InterferenceDLSetup(m_errorRate);
     temp->InterferenceULSetup(m_errorRate);
 
     if(trafficClassifier[i] == 1)
@@ -89,7 +89,7 @@ void Experiment::Setup()
     staNodes.push_back(temp);
   }
 
-  LiScanRun cfp(staNodes,apNode);
+  CFPPhyBase cfp(staNodes,apNode);
   m_cfp = cfp;
 }
 
@@ -208,7 +208,7 @@ main (int argc, char *argv[])
             << ", Client size: " << *clientSizeIter << std::endl;
 
               Experiment experiment(run,percTraffic, *trafficRateIter, errorRate,
-                *clientSizeIter, simTime, "liscan_cfp_data_shorter.txt");
+                *clientSizeIter, simTime, "80211_pcf_data_shorter.txt");
               experiment.Setup();
               experiment.Run();
           }

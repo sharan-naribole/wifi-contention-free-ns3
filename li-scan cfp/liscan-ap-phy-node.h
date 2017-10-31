@@ -48,7 +48,9 @@ private:
   void StartIdleTimer();
   void PhyRxBegin(Ptr< const Packet > packet);
   void PhyRxEnd(Ptr< const Packet > packet);
+  void PhyRxDrop(Ptr< const Packet > packet);
   void ReceptionState();
+  void CheckBusy();
 
   friend class LiscanStaNode;
 };
@@ -105,6 +107,7 @@ void LiscanApNode::PhyUplinkSetup(WifiPhyStandard standard, Ptr<YansWifiChannel>
   m_ul -> SetReceiveOkCallback(MakeCallback(&LiscanApNode::ReceivePollReply,this));
   m_ul -> TraceConnectWithoutContext("PhyRxBegin", MakeCallback(&LiscanApNode::PhyRxBegin,this));
   m_ul -> TraceConnectWithoutContext("PhyRxEnd", MakeCallback(&LiscanApNode::PhyRxEnd,this));
+  m_ul -> TraceConnectWithoutContext("PhyRxDrop", MakeCallback(&LiscanApNode::PhyRxDrop,this));
 }
 
 void LiscanApNode::StartPolling(uint32_t staIndex, uint32_t nSta)
@@ -153,6 +156,8 @@ void LiscanApNode::TransmitPollRequest()
      {
        m_staIndex++;
      }
+
+     Simulator::Schedule(MicroSeconds(pollTxTime + 1), &LiscanApNode::TransmitPollRequest, this);
    }
 }
 
@@ -173,12 +178,9 @@ void LiscanApNode::ReceivePollReply (Ptr<Packet> p, double snr, WifiTxVector txV
       << Simulator::Now().GetMicroSeconds()
       << std::endl;
       */
-
       m_rxBytes += p->GetSize();
 
       Simulator::Schedule(MicroSeconds(decodeDelay),&LiscanApNode::TransmitACK,this, "ACK");
-
-      //Simulator::Schedule(MicroSeconds(PIFS),&LiscanApNode::TransmitPollRequest,this);
     }
   }
   else
@@ -191,6 +193,7 @@ void LiscanApNode::ReceivePollReply (Ptr<Packet> p, double snr, WifiTxVector txV
 void LiscanApNode::TransmitACK(std::string message)
 {
   Send(m_dl,m_ackId, ACKSize, message);
+  Simulator::Schedule(MicroSeconds(ACKTxTime + 1),&LiscanApNode::TransmitPollRequest,this);
 
   /*
   std::cout << "Transmitted " << message << " at "
@@ -219,8 +222,12 @@ uint32_t LiscanApNode::GetRxBytes()
 
 void LiscanApNode::PhyRxBegin(Ptr< const Packet > packet)
 {
-  //std::cout << "Started Poll Reply Reception at "
-  //<< Simulator::Now().GetMicroSeconds() << std::endl;
+  /*
+  std::cout << "Started Poll Reply Reception at "
+  << Simulator::Now().GetMicroSeconds() << std::endl;
+  */
+
+  //std::cout << packet ->GetSize() << std::endl;
 
   Simulator::Schedule(MicroSeconds(3), &LiscanApNode::ReceptionState,this);
 }
@@ -232,7 +239,42 @@ void LiscanApNode::ReceptionState()
 
 void LiscanApNode::PhyRxEnd(Ptr< const Packet > packet)
 {
+  /*
+  std::cout << "Ended Poll Reply Reception at "
+  << Simulator::Now().GetMicroSeconds() << std::endl;
+  */
   m_receiving = false;
+}
+
+void LiscanApNode::PhyRxDrop(Ptr< const Packet > packet)
+{
+  //std::cout << "Poll Reply Dropped by channel error at "
+  //<< Simulator::Now().GetMicroSeconds() << std::endl;
+  CheckBusy();
+  //std::cout << m_ul -> IsStateCcaBusy() << std::endl;
+  //std::cout << m_ul -> IsStateBusy() << std::endl;
+  //std::cout << m_ul -> IsStateIdle() << std::endl;
+}
+
+void LiscanApNode::CheckBusy()
+{
+  if(m_ul -> IsStateBusy())
+  {
+    Simulator::Schedule(MicroSeconds(10), &LiscanApNode::CheckBusy, this);
+  }
+  else
+  {
+    if(m_ul -> IsStateIdle())
+    {
+      m_staIndex = m_prevIndex;
+      m_receiving = false;
+      TransmitPollRequest();
+    }
+    else
+    {
+      Simulator::Schedule(MicroSeconds(10), &LiscanApNode::CheckBusy, this);
+    }
+  }
 }
 
 

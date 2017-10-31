@@ -238,8 +238,8 @@ void LiscanStaNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVect
         //std::cout << "Poll Request Dropped" << std::endl;
       }
     }
-    //std::cout << "AP Rx status = " << m_apNode->m_receiving << std::end
-    m_apNode -> TransmitPollRequest();
+    //std::cout << "Calling TransmitPollRequest() " << std::endl;
+    //m_apNode -> TransmitPollRequest();
   }
 }
 
