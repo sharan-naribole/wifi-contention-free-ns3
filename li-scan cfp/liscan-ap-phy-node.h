@@ -141,11 +141,9 @@ void LiscanApNode::TransmitPollRequest()
 
     Send(m_dl,m_staIndex, pollSize, "REQ"); // Poll Request
 
-    /*
-    std::cout << "Transmitting poll request to Node "
-    << m_staIndex << " at " << Simulator::Now ().GetMicroSeconds ()
-    << std::endl;
-    */
+    //std::cout << "Transmitting poll request to Node "
+    //<< m_staIndex << " at " << Simulator::Now ().GetMicroSeconds ()
+    //<< std::endl;
 
     m_prevIndex = m_staIndex;
     if(m_staIndex == m_nSta)
@@ -185,8 +183,13 @@ void LiscanApNode::ReceivePollReply (Ptr<Packet> p, double snr, WifiTxVector txV
   }
   else
   {
-    Simulator::Schedule(MicroSeconds(decodeDelay),&LiscanApNode::TransmitACK,this, "NACK");
-    m_overhead += ACKTxTime;
+    /*
+    std::cout << "Received data corrupted by channel at "
+    << Simulator::Now().GetMicroSeconds() << std::endl;
+    */
+    TransmitPollRequest();
+    //Simulator::Schedule(MicroSeconds(decodeDelay),&LiscanApNode::TransmitPollRequest,this);
+    //m_overhead += ACKTxTime;
   }
 }
 
@@ -222,10 +225,8 @@ uint32_t LiscanApNode::GetRxBytes()
 
 void LiscanApNode::PhyRxBegin(Ptr< const Packet > packet)
 {
-  /*
-  std::cout << "Started Poll Reply Reception at "
-  << Simulator::Now().GetMicroSeconds() << std::endl;
-  */
+  //std::cout << "Started Poll Reply Reception at "
+  //<< Simulator::Now().GetMicroSeconds() << std::endl;
 
   //std::cout << packet ->GetSize() << std::endl;
 
@@ -239,10 +240,8 @@ void LiscanApNode::ReceptionState()
 
 void LiscanApNode::PhyRxEnd(Ptr< const Packet > packet)
 {
-  /*
-  std::cout << "Ended Poll Reply Reception at "
-  << Simulator::Now().GetMicroSeconds() << std::endl;
-  */
+  //std::cout << "Ended Poll Reply Reception at "
+  //<< Simulator::Now().GetMicroSeconds() << std::endl;
   m_receiving = false;
 }
 

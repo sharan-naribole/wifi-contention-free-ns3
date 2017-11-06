@@ -14,6 +14,7 @@ private:
   uint32_t m_NPacketsTX = 0;
   bool m_waitingACK = false;
   bool m_nextTx = false;
+  bool m_abort = false;
 
   void PacketQueuePop();
   void ReceivePacket (Ptr<Packet> p, double snr, WifiTxVector txVector);
@@ -95,49 +96,41 @@ void LiscanStaNode::PacketQueuePop()
   uint32_t Npackets = m_ppbp->m_packetQueue.size();
   if(Npackets > 0)
   {
+    m_reTxQueue = m_ppbp->m_packetQueue;
+    //Transmitting Poll reply
+
+    /*
+    std::cout << "Transmitting "
+    << Npackets << " packets by Node "
+    << m_nodeId<< " at "
+    << Simulator::Now ().GetMicroSeconds ()
+    << std::endl;
+    */
+
+    uint32_t aggPktSize = 0;
+    //std::cout << "Queue size = "
+    //<< currQueue.size() << std::endl;
+
+    for(uint32_t i = 0; i< m_reTxQueue.size(); i++)
+    {
+      aggPktSize += m_ppbp->m_packetQueue.front()->GetSize();
+      m_NPacketsTX += 1;
+      m_delaySum += (Simulator::Now() - m_ppbp->m_packetGenTime.front()).GetMicroSeconds();
+
+      m_ppbp->m_packetQueue.pop();
+      m_ppbp->m_packetGenTime.pop();
+    }
+
     if(m_rvUL->GetValue() > m_remUL->GetRate())
     {
-      m_reTxQueue = m_ppbp->m_packetQueue;
-      //Transmitting Poll reply
-
-      /*
-      std::cout << "Transmitting "
-      << Npackets << " packets by Node "
-      << m_nodeId<< " at "
-      << Simulator::Now ().GetMicroSeconds ()
-      << std::endl;
-      */
-
-      uint32_t aggPktSize = 0;
-      //std::cout << "Queue size = "
-      //<< currQueue.size() << std::endl;
-
-      for(uint32_t i = 0; i< m_reTxQueue.size(); i++)
-      {
-        aggPktSize += m_ppbp->m_packetQueue.front()->GetSize();
-        m_NPacketsTX += 1;
-        m_delaySum += (Simulator::Now() - m_ppbp->m_packetGenTime.front()).GetMicroSeconds();
-
-        m_ppbp->m_packetQueue.pop();
-        m_ppbp->m_packetGenTime.pop();
-      }
-
       Send(m_ul, 0,aggPktSize);
       m_waitingACK = true;
       m_apNode -> m_ackId = m_nodeId;
-
-      /*
-      std::cout << "Queue size after popping: "
-      << m_ppbp -> m_packetQueue.size() << std::endl;
-
-      std::cout << "Started Poll Reply Transmission at "
-      << Simulator::Now().GetMicroSeconds()
-      << " by Node " << m_nodeId << std::endl;
-      */
     }
     else
     {
-      //std::cout << "Aborted Poll Reply Transmission" << std::endl;
+      m_abort = true;
+      std::cout << "Aborted Poll Reply Transmission" << std::endl;
     }
   }
   else
@@ -164,8 +157,17 @@ void LiscanStaNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVect
   << std::endl;
   */
 
-  if(destinationHeader.GetData() != m_nodeId)
+  if(destinationHeader.GetData() == 0 && m_nextTx == true)
   {
+    m_nextTx = false;
+    PacketQueuePop();
+    //std::cout << "Next in line's TX begins" << std::endl;
+  }
+  else if(destinationHeader.GetData() > 0 && destinationHeader.GetData() != m_nodeId)
+  {
+
+    m_nextTx = false;
+
     if(m_waitingACK == true && !m_ul -> IsStateTx())
     {
       m_ppbp -> PushQueue(m_reTxQueue);
@@ -182,17 +184,19 @@ void LiscanStaNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVect
       << m_ppbp -> m_packetQueue.size() << std::endl;
       */
     }
-    else if(m_nextTx == true)
+    
+    else if(m_abort == true)
     {
-      m_nextTx = false;
-      if(msg == "ACK" || msg == "NACK")
-      {
-        PacketQueuePop();
-      }
-      //std::cout << "Next in line's TX begins" << std::endl;
+      m_ppbp -> PushQueue(m_reTxQueue);
+      //std::cout << "NACK received" << std::endl;
+      // Clearing the retransmission queue on receiving ACK
+      std::queue<Ptr<Packet>> temp;
+      temp.swap(m_reTxQueue);
+      m_abort= false;
     }
+
   }
-  else
+  else if (destinationHeader.GetData() == m_nodeId)
   {
     //We know the packet is for this Station
     //We have to figure out if it is a Poll request
@@ -200,6 +204,7 @@ void LiscanStaNode::ReceivePacket(Ptr<Packet> p, double snr, WifiTxVector txVect
     // will pop the recently transmitted packets or not
 
     //std::cout<<"Received: "<< msg << std::endl;
+
     if(msg == "ACK")
     {
       // Clearing the retransmission queue on receiving ACK

@@ -51,6 +51,7 @@ private:
   void PhyRxDrop(Ptr< const Packet > packet);
   void ReceptionState();
   void CheckBusy();
+  //void TriggerNext(std::string msg);
 
   friend class LiscanStaNode;
 };
@@ -182,16 +183,31 @@ void LiscanApNode::ReceivePollReply (Ptr<Packet> p, double snr, WifiTxVector txV
     }
 }
 
+/*
+void LiscanApNode::TriggerNext(std::string msg)
+{
+  std::cout << "Transmitting Trigger packet to Node "
+  << m_prevIndex << " at " << Simulator::Now ().GetMicroSeconds ()
+  << std::endl;
+  Send(m_dl,m_prevIndex, triggerSize, "NXT");
+  if(msg == "ACK")
+  {
+    Simulator::Schedule(MicroSeconds(decodeDelay + triggerTime),&LiscanApNode::TransmitACK,this, "ACK");
+  }
+  else if(msg == "DROP")
+  {
+    Simulator::Schedule(MicroSeconds(triggerTime),&LiscanApNode::TransmitPollRequest,this);
+  }
+}
+*/
+
 void LiscanApNode::TransmitACK(std::string message)
 {
+  //std::cout << "Transmitting " << message << " at "
+  //<< Simulator::Now ().GetMicroSeconds ()
+  //<< std::endl;
   Send(m_dl,m_ackId, ACKSize, message);
   Simulator::Schedule(MicroSeconds(ACKTxTime + 1),&LiscanApNode::TransmitPollRequest,this);
-
-  /*
-  std::cout << "Transmitted " << message << " at "
-  << Simulator::Now ().GetMicroSeconds ()
-  << std::endl;
-  */
 
   //Time ACKTxTime (MicroSeconds ((double)(ACKSize* 8.0*1000000) /((double) m_datarate)));
   //Simulator::Schedule(MicroSeconds((double)1.2*ACKTxTime),&LiscanApNode::TransmitPollRequest,this);
@@ -258,8 +274,9 @@ void LiscanApNode::CheckBusy()
   {
     if(m_ul -> IsStateIdle())
     {
-      m_staIndex = m_prevIndex;
+      //m_staIndex = m_prevIndex;
       m_receiving = false;
+      //TriggerNext("DROP");
       TransmitPollRequest();
     }
     else
