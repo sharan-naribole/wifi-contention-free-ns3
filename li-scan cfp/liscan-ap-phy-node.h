@@ -32,6 +32,7 @@ private:
   bool m_stop = false;
   bool m_receiving = false;
   bool m_apIdleTimerStart = false;
+  bool m_waitingACK = false;
 
   double m_overhead = -1*pollTxTime;
   uint32_t m_rxBytes = 0;
@@ -51,6 +52,7 @@ private:
   void PhyRxDrop(Ptr< const Packet > packet);
   void ReceptionState();
   void CheckBusy();
+  //void TriggerNext(std::string msg);
 
   friend class LiscanStaNode;
 };
@@ -132,14 +134,20 @@ void LiscanApNode::StopPolling()
 void LiscanApNode::TransmitPollRequest()
 {
   //std::cout << "Test" << std::endl;
+  if(m_waitingACK == true)
+  {
+    TransmitACK("ACK");
+  }
 
-  if(m_stop == false && m_receiving == false)
+  else if(m_stop == false && m_receiving == false
+    && m_waitingACK == false && m_dl->IsStateTx() == false)
   {
     //std::cout << "Station = " << m_staIndex << " out of "
     //<< m_nSta << std::endl;
 
 
     Send(m_dl,m_staIndex, pollSize, "REQ"); // Poll Request
+
 
     //std::cout << "Transmitting poll request to Node "
     //<< m_staIndex << " at " << Simulator::Now ().GetMicroSeconds ()
@@ -187,23 +195,57 @@ void LiscanApNode::ReceivePollReply (Ptr<Packet> p, double snr, WifiTxVector txV
     std::cout << "Received data corrupted by channel at "
     << Simulator::Now().GetMicroSeconds() << std::endl;
     */
+    //std::cout << "TX state: " << m_dl -> IsStateTx() << std::endl;
     TransmitPollRequest();
     //Simulator::Schedule(MicroSeconds(decodeDelay),&LiscanApNode::TransmitPollRequest,this);
     //m_overhead += ACKTxTime;
   }
 }
 
+/*
+void LiscanApNode::TriggerNext(std::string msg)
+{
+  std::cout << "Transmitting Trigger packet to Node "
+  << m_prevIndex << " at " << Simulator::Now ().GetMicroSeconds ()
+  << std::endl;
+  Send(m_dl,m_prevIndex, triggerSize, "NXT");
+  if(msg == "ACK")
+  {
+    Simulator::Schedule(MicroSeconds(decodeDelay + triggerTime),&LiscanApNode::TransmitACK,this, "ACK");
+  }
+  else if(msg == "DROP")
+  {
+    Simulator::Schedule(MicroSeconds(triggerTime),&LiscanApNode::TransmitPollRequest,this);
+  }
+}
+*/
+
 void LiscanApNode::TransmitACK(std::string message)
 {
-  Send(m_dl,m_ackId, ACKSize, message);
-  Simulator::Schedule(MicroSeconds(ACKTxTime + 1),&LiscanApNode::TransmitPollRequest,this);
-
-  /*
-  std::cout << "Transmitted " << message << " at "
-  << Simulator::Now ().GetMicroSeconds ()
-  << std::endl;
-  */
-
+  //std::cout << "Transmitting " << message << " at "
+  //<< Simulator::Now ().GetMicroSeconds ()
+  //<< std::endl;
+  //std::cout << "TX status: " << m_dl -> IsStateTx() << std::endl;
+  //std::cout << "Switch status: " << m_dl -> IsStateSwitching() << std::endl;
+  //std::cout << "ACK waiting status: " << m_waitingACK
+  //<< " at " << Simulator::Now().GetMicroSeconds() << std::endl;
+  if(m_dl -> IsStateTx())
+  {
+    m_waitingACK = true;
+    //std::cout << "Updated ACK waiting status: " << m_waitingACK
+    //<< " at " << Simulator::Now().GetMicroSeconds() << std::endl;
+    //Simulator::Schedule(MicroSeconds(2), &LiscanApNode::TransmitACK, this, "ACK");
+  }
+  else
+  {
+    m_waitingACK = false;
+    //std::cout << "Updated ACK waiting status: " << m_waitingACK
+    //<< " at " << Simulator::Now().GetMicroSeconds() << std::endl;
+    //std::cout << "Transmitting ACK at "
+    //<< Simulator::Now().GetMicroSeconds() << std::endl;
+    Send(m_dl,m_ackId, ACKSize, message);
+    Simulator::Schedule(MicroSeconds(ACKTxTime + 1),&LiscanApNode::TransmitPollRequest,this);
+  }
   //Time ACKTxTime (MicroSeconds ((double)(ACKSize* 8.0*1000000) /((double) m_datarate)));
   //Simulator::Schedule(MicroSeconds((double)1.2*ACKTxTime),&LiscanApNode::TransmitPollRequest,this);
 }
@@ -242,6 +284,7 @@ void LiscanApNode::PhyRxEnd(Ptr< const Packet > packet)
 {
   //std::cout << "Ended Poll Reply Reception at "
   //<< Simulator::Now().GetMicroSeconds() << std::endl;
+
   m_receiving = false;
 }
 
@@ -259,19 +302,23 @@ void LiscanApNode::CheckBusy()
 {
   if(m_ul -> IsStateBusy())
   {
-    Simulator::Schedule(MicroSeconds(10), &LiscanApNode::CheckBusy, this);
+    Simulator::Schedule(MicroSeconds(5), &LiscanApNode::CheckBusy, this);
   }
   else
   {
     if(m_ul -> IsStateIdle())
     {
-      m_staIndex = m_prevIndex;
       m_receiving = false;
-      TransmitPollRequest();
+      if(m_dl -> IsStateTx() == false)
+      {
+        //std::cout << "Calling TransmitPollRequest after drop at: "
+        //<< Simulator::Now().GetMicroSeconds() << std::endl;
+        TransmitPollRequest();
+      }
     }
     else
     {
-      Simulator::Schedule(MicroSeconds(10), &LiscanApNode::CheckBusy, this);
+      Simulator::Schedule(MicroSeconds(5), &LiscanApNode::CheckBusy, this);
     }
   }
 }

@@ -30,6 +30,7 @@ private:
   uint32_t m_nSta;
   bool m_stop = false;
   bool m_apIdleTimerStart = false;
+  bool m_ackTx = false;
 
   double m_overhead = 0;
   uint32_t m_rxBytes = 0;
@@ -46,6 +47,7 @@ private:
   void StartIdleTimer();
   void PhyRxBegin(Ptr< const Packet > packet);
   void PhyRxDrop(Ptr< const Packet > packet);
+  void PhyRxEnd(Ptr< const Packet > packet);
   void RxAbort();
   void CheckBusy();
 
@@ -103,6 +105,7 @@ void ApPhyNode::PhyUplinkSetup(WifiPhyStandard standard, Ptr<YansWifiChannel> ch
   m_ul -> SetReceiveOkCallback(MakeCallback(&ApPhyNode::ReceivePollReply,this));
   m_ul -> TraceConnectWithoutContext("PhyRxBegin", MakeCallback(&ApPhyNode::PhyRxBegin,this));
   m_dl -> TraceConnectWithoutContext("PhyRxDrop", MakeCallback(&ApPhyNode::PhyRxDrop,this));
+  m_dl -> TraceConnectWithoutContext("PhyRxEnd", MakeCallback(&ApPhyNode::PhyRxEnd,this));
 }
 
 void ApPhyNode::StartPolling(uint32_t staIndex, uint32_t nSta)
@@ -128,7 +131,7 @@ void ApPhyNode::TransmitPollRequest()
 {
   //std::cout << "Test" << std::endl;
 
-  if(m_stop == false)
+  if(m_stop == false && m_dl->IsStateTx() == false && m_ackTx == false)
   {
     //std::cout << "Station = " << m_staIndex << " out of "
     //<< m_nSta << std::endl;
@@ -142,11 +145,9 @@ void ApPhyNode::TransmitPollRequest()
     */
     Send(m_dl,m_staIndex, pollSize, "REQ"); // Poll Request
 
-    /*
-    std::cout << "Transmitting poll request to Node "
-    << m_staIndex << " at " << Simulator::Now ().GetMicroSeconds ()
-    << std::endl;
-    */
+    //std::cout << "Transmitting poll request to Node "
+    //<< m_staIndex << " at " << Simulator::Now ().GetMicroSeconds ()
+    //<< std::endl;
 
     // Need to change this based on poll TX Time
     m_overhead += pollTxTime; // from Globals
@@ -167,12 +168,12 @@ void ApPhyNode::TransmitPollRequest()
 
 void ApPhyNode::ReceivePollReply (Ptr<Packet> p, double snr, WifiTxVector txVector)
 {
+  BasicHeader destinationHeader;
+  p->RemoveHeader (destinationHeader);
   // At this stage, I will check the Interference Model
   if(m_remUL->IsCorrupt (p) == false)
   {
     // At this stage, I will check the Interference Model
-    BasicHeader destinationHeader;
-    p->RemoveHeader (destinationHeader);
 
     if(destinationHeader.GetData() == 0)
     {
@@ -186,6 +187,7 @@ void ApPhyNode::ReceivePollReply (Ptr<Packet> p, double snr, WifiTxVector txVect
 
       m_rxBytes += p->GetSize();
 
+      m_ackTx = true;
       Simulator::Schedule(MicroSeconds(SIFS),&ApPhyNode::TransmitACK,this, "ACK");
       m_overhead += (SIFS - decodeDelay); // after Packet reception, switching from
                                           // RX to TX
@@ -193,36 +195,56 @@ void ApPhyNode::ReceivePollReply (Ptr<Packet> p, double snr, WifiTxVector txVect
   }
   else
   {
+    /*
+    std::cout << "Corrupted poll reply by Node "
+    << destinationHeader.GetData() << " of size "
+    << p->GetSize() << " at "
+    << Simulator::Now().GetMicroSeconds()
+    << std::endl;
+    */
     Simulator::Schedule(MicroSeconds(SIFS),&ApPhyNode::TransmitPollRequest,this);
   }
 }
 
 void ApPhyNode::TransmitACK(std::string message)
 {
+  /*
+  std::cout << "Transmitting " << message << " at "
+  << Simulator::Now ().GetMicroSeconds ()
+  << std::endl;
+  */
   Send(m_dl,m_prevIndex, ACKSize, message);
+  m_ackTx = false;
   Simulator::Schedule(MicroSeconds(ACKTxTime),&ApPhyNode::TransmitPollRequest,this);
-
-
-  //std::cout << "Transmitted " << message << " at "
-  //<< Simulator::Now ().GetMicroSeconds ()
-  //<< std::endl;
 
   //Time ACKTxTime (MicroSeconds ((double)(ACKSize* 8.0*1000000) /((double) m_datarate)));
 }
 
 void ApPhyNode::CheckIdle()
 {
-  //std::cout << "Checking idle at "
-  //<< Simulator::Now().GetMicroSeconds() << std::endl;
+  /*
+  std::cout << "Checking idle at "
+  << Simulator::Now().GetMicroSeconds() << std::endl;
+
+  std::cout << m_ul -> IsStateCcaBusy() << std::endl;
+  std::cout << m_ul -> IsStateBusy() << std::endl;
+  std::cout << m_ul -> IsStateIdle() << std::endl;
+  std::cout << m_ul -> IsStateTx() << std::endl;
+  std::cout << m_ul -> IsStateRx() << std::endl;
+  */
 
   if(m_apIdleTimerStart)
   {
     m_overhead += PIFS;
-    //std::cout << "Calling TransmitPollRequest()" << std::endl;
+    //std::cout << "Idle; Calling TransmitPollRequest()" << std::endl;
     TransmitPollRequest();
   }
-  else{
+  else
+  {
+    //std::cout << "Not Idle" << std::endl;
     m_overhead += SIFS;
+    CheckBusy();
+    //Simulator::Schedule(MicroSeconds(10), &ApPhyNode::Chec)
   }
   m_apIdleTimerStart = false;
 }
@@ -263,6 +285,11 @@ void ApPhyNode::PhyRxBegin(Ptr< const Packet > packet)
     m_apIdleTimerStart = false;
   }
 
+}
+
+void ApPhyNode::PhyRxEnd(Ptr< const Packet > packet)
+{
+  //std::cout << "Ended Poll Reply Reception" << std::endl;
 }
 
 void ApPhyNode::PhyRxDrop(Ptr< const Packet > packet)

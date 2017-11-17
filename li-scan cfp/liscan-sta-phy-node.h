@@ -10,11 +10,13 @@ class LiscanStaNode: public PhyNode {
 private:
   LiscanApNode* m_apNode;
   std::queue<Ptr<Packet>> m_reTxQueue;
+  uint32_t m_aggSize;
+  bool m_aggAll = true;
   double m_delaySum = 0;
   uint32_t m_NPacketsTX = 0;
   bool m_waitingACK = false;
   bool m_nextTx = false;
-  bool m_abort = true;
+  bool m_abort = false;
 
   void PacketQueuePop();
   void ReceivePacket (Ptr<Packet> p, double snr, WifiTxVector txVector);
@@ -22,7 +24,8 @@ private:
 
 public:
   Ptr<PPBPQueue> m_ppbp = CreateObject<PPBPQueue>();
-  LiscanStaNode(LiscanApNode*, uint32_t, std::string, uint8_t, Vector);
+  LiscanStaNode(LiscanApNode*, uint32_t, std::string, uint8_t, Vector,
+    uint32_t, bool);
   void PhyDownlinkSetup(WifiPhyStandard, Ptr<YansWifiChannel>, Ptr<ErrorRateModel>,
                         uint8_t);
   void PhyUplinkSetup(WifiPhyStandard, Ptr<YansWifiChannel>, Ptr<ErrorRateModel>,
@@ -34,8 +37,10 @@ public:
 };
 
 LiscanStaNode::LiscanStaNode(LiscanApNode* apNode, uint32_t nodeId, std::string txMode,
-                        uint8_t txPowerLevel, Vector loc)
-: PhyNode(nodeId, txMode, txPowerLevel, loc), m_apNode(apNode)
+                        uint8_t txPowerLevel, Vector loc,
+                        uint32_t aggSize, bool aggAll)
+: PhyNode(nodeId, txMode, txPowerLevel, loc), m_apNode(apNode),
+m_aggSize(aggSize), m_aggAll(aggAll)
 {
   //m_ppbp = new PPBPGenerator(nodeId);
   m_ppbp -> SetNodeId(nodeId);
@@ -96,41 +101,72 @@ void LiscanStaNode::PacketQueuePop()
   uint32_t Npackets = m_ppbp->m_packetQueue.size();
   if(Npackets > 0)
   {
-    m_reTxQueue = m_ppbp->m_packetQueue;
+    std::queue<Ptr<Packet>> temp;
+    temp.swap(m_reTxQueue);
+    //m_reTxQueue = m_ppbp->m_packetQueue;
     //Transmitting Poll reply
+
+    /*
+    std::cout << "Transmitting "
+    << Npackets << " packets by Node "
+    << m_nodeId<< " at "
+    << Simulator::Now ().GetMicroSeconds ()
+    << std::endl;
+    */
 
     uint32_t aggPktSize = 0;
     //std::cout << "Queue size = "
     //<< currQueue.size() << std::endl;
 
-    for(uint32_t i = 0; i< m_reTxQueue.size(); i++)
+    for(uint32_t i = 0; i< Npackets; i++)
     {
-      aggPktSize += m_ppbp->m_packetQueue.front()->GetSize();
-      m_NPacketsTX += 1;
-      m_delaySum += (Simulator::Now() - m_ppbp->m_packetGenTime.front()).GetMicroSeconds();
+      if((m_aggAll == false) && ((aggPktSize + m_ppbp->m_packetQueue.front()->GetSize()) > m_aggSize))
+      {
+        //std::cout << "Breaking" << std::endl;
+        break;
+      }
+      else
+      {
+        aggPktSize += m_ppbp->m_packetQueue.front()->GetSize();
+        //std::cout << "Aggregated size = "
+        //<< aggPktSize << std::endl;
+        m_NPacketsTX += 1;
+        m_delaySum += (Simulator::Now() - m_ppbp->m_packetGenTime.front()).GetMicroSeconds();
 
-      m_ppbp->m_packetQueue.pop();
-      m_ppbp->m_packetGenTime.pop();
+        m_reTxQueue.push(m_ppbp->m_packetQueue.front());
+        m_ppbp->m_packetQueue.pop();
+        m_ppbp->m_packetGenTime.pop();
+      }
     }
+
+    //std::cout << "Aggregated size = "
+    //<< aggPktSize << std::endl;
+
+    if(m_aggAll ==true && aggPktSize > m_aggSize)
+    {
+      aggPktSize = m_aggSize;
+    }
+
+    //std::cout << "Aggregated size = "
+    //<< aggPktSize << std::endl;
 
     if(m_rvUL->GetValue() > m_remUL->GetRate())
     {
-      /*
-      std::cout << "Transmitting "
-      << Npackets << " packets by Node "
-      << m_nodeId<< " at "
-      << Simulator::Now ().GetMicroSeconds ()
-      << std::endl;
-      */
-      Send(m_ul, 0,aggPktSize);
-      m_waitingACK = true;
-      m_apNode -> m_ackId = m_nodeId;
+      if(aggPktSize > 0)
+      {
+        Send(m_ul, 0,aggPktSize);
+        m_waitingACK = true;
+        m_apNode -> m_ackId = m_nodeId;
+      }
     }
     else
     {
       m_abort = true;
       //std::cout << "Aborted Poll Reply Transmission" << std::endl;
     }
+  }
+  else
+  {
   }
 }
 
