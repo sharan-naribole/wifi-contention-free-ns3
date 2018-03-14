@@ -20,7 +20,7 @@ public:
    * Set the header data.
    * \param data The data.
    */
-  void SetData (uint16_t data);
+  void SetData (uint8_t data);
   /**
    * Get the header data.
    * \return The data.
